@@ -8,6 +8,7 @@ import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.CommandManager;
 import me.jumpwatch.webserver.utils.UpdateChecker;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -25,6 +26,7 @@ import java.util.logging.Logger;
 
 public class WebCore extends JavaPlugin {
     private boolean debug;
+    public static String prefix = ChatColor.translateAlternateColorCodes('&', "&7[&3&lWebPlugin&7]&r");
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private WebCore m = this;
@@ -147,7 +149,7 @@ public class WebCore extends JavaPlugin {
             Startwebserver();
         }
         if (CheckOS.isUnix()) {
-            logger.info("Due to some issues PHP on linux is currently not a thing.");
+            logger.info("Linux PHP is currently not being developed on as i'm looking into alternatives to make it work correct.");
         }
     }
 
@@ -172,7 +174,9 @@ public class WebCore extends JavaPlugin {
             e.printStackTrace();
         }
         if (getConfig().getBoolean("Settings.EnablePHP")) {
-            WindowsPHPNginxCore.StopWindowsNginxandPHP();
+            if (CheckOS.isWindows()) {
+                WindowsPHPNginxCore.StopWindowsNginxandPHP();
+            }
         }
     }
 
@@ -216,9 +220,124 @@ public class WebCore extends JavaPlugin {
     }
 
     private void registerCommand(){
-        commandManager.register("", ((sender, params) -> {
-
+        commandManager.register("help", ((sender, params) -> {
+            if (sender.hasPermission("web.help") || sender.hasPermission("web.*")) {
+                sender.sendMessage(prefix + " Commands: ");
+                sender.sendMessage(prefix + " /webp reload reloads the plugin's configuration (NOT RESET)");
+                sender.sendMessage(prefix + " /webp dev gets who developed this plugin and plugin version");
+                sender.sendMessage(prefix + " /webp ver gets plugin version and checks if there is a new version");
+                sender.sendMessage(prefix + " /webp help to get this again.");
+                sender.sendMessage(prefix + " /webp stopweb (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp startweb (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp reloadweb (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp reset (ONLY works in console!)");
+                return;
+            } else {
+                sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
+                return;
+            }
         }));
+        commandManager.register("stopweb", ((sender, params) -> {
+            if (sender.hasPermission("web.stop") || sender.hasPermission("web.*")) {
+                WindowsPHPNginxCore.StopWindowsNginxandPHP();
+                sender.sendMessage(prefix + " Stopped webserver (PHP)");
+            }
+        }));
+        commandManager.register("startweb", ((sender, params) -> {
+            if (sender.hasPermission("web.start") || sender.hasPermission("web.*")) {
+                WindowsPHPNginxCore.StartWindowsNginxandPHP();
+                sender.sendMessage(prefix + " Started webserver (PHP)");
+            }
+        }));
+        commandManager.register("reloadweb", ((sender, params) -> {
+            if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
+                WindowsPHPNginxCore.reloadWindowsNginxandPHP();
+                sender.sendMessage(prefix + " Reloaded webserver (PHP)");
+            }
+        }));
+        commandManager.register("reload", ((sender, params) -> {
+            if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
+                reloadConfig();
+                sender.sendMessage(prefix + " Configuration file reloaded.");
+                return;
+            }else {
+                sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
+                return;
+            }
+        }));
+        commandManager.register("dev", ((sender, params) -> {
+            if (sender.hasPermission("web.dev") || sender.hasPermission("web.*")) {
+                sender.sendMessage(prefix + " This plugin is developed by " + getDescription().getAuthors());
+                sender.sendMessage(prefix + " Your running version: " + ChatColor.RED + getDescription().getVersion());
+                return;
+            }else {
+                sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
+                return;
+            }
+        }));
+        commandManager.register("ver", ((sender, params) -> {
+            if (sender.hasPermission("web.ver") || sender.hasPermission("web.*")) {
+                sender.sendMessage(prefix + " Your running version: " + ChatColor.RED + getDescription().getVersion() + ChatColor.RESET + getver());
+                return;
+            }else {
+                sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
+                return;
+            }
+        }));
+        commandManager.register("reset", ((sender, params) -> {
+            if (CommandValidate.console(sender)) return;
+            if (params.length == 0){
+                sender.sendMessage(prefix + ChatColor.RED + " [WARNING] THIS WILL ERASE EVERYTHING IN THE CONFIG!");
+                sender.sendMessage(prefix + " Please confirm the reset!");
+                sender.sendMessage(prefix + " /webp reset confirm");
+                return;
+            }
+            if (params.length == 1) {
+                sender.sendMessage(prefix + " Starting config reset!");
+                resetconfig(((Player) sender).getPlayer());
+                return;
+            }
+        }));
+
+
+
+
+        commandManager.register("", ((sender, params) -> {
+            if (!(sender instanceof Player)){
+                if (getConfig().getString("Settings.ServerIP").equalsIgnoreCase("localhost")){
+                    sender.sendMessage(prefix + ChatColor.RED + " ServerIP not changed in config!");
+                    sender.sendMessage(prefix + " Webserver info: ");
+                    if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
+                        sender.sendMessage("");
+                    }
+                }else {
+                    sender.sendMessage(prefix + " Webserver info: ");
+                    if (getConfig().getBoolean("SSLSettings.EnableSSL")){
+
+                    }
+                }
+            }
+        }));
+    }
+
+    public void resetconfig(Player sender){
+        sender.sendMessage("WARNING You are now resetting your config.yml");
+        sender.sendMessage("An backup will be made!");
+        File backup = new File(getDataFolder(), "config.yml");
+        sender.sendMessage("Making backup");
+        FileUtil.copy(backup, new File(backup + ".backup"));
+        backup.delete();
+        sender.sendMessage("Done!");
+        sender.sendMessage("config was set to reset!.");
+        sender.sendMessage("RECREATING");
+        saveResource("config.yml", true);
+    }
+    public String getver(){
+        if (getDescription().getVersion().equals(ver)) {
+            return " and your running the newest version!";
+        }else {
+            return " and the newest version is: " + ChatColor.RED + ver;
+        }
     }
 
 

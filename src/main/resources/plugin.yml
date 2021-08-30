@@ -10,5 +10,4 @@ author:
 commands:
   WebP:
     description: Gets IP or Domain W/ Port
-    permission: web.show
     usage: /<command>
