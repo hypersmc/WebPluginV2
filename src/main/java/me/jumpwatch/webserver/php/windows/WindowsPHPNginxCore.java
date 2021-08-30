@@ -84,6 +84,8 @@ public class WindowsPHPNginxCore {
             Process PNginx = Runtime.getRuntime().exec(Nginx);
             main.getLogger().info("Attempting to start PHP");
             Process PPHP = Runtime.getRuntime().exec(PHP);
+            main.getLogger().info("PHP Webserver started on:");
+            main.getLogger().info(main.getConfig().getString("Settings.ServerIP") + ":" + main.getConfig().getString("Settings.PHPPort"));
             String line;
             if (main.getConfig().getBoolean("Settings.debug")){
                 BufferedReader bri = new BufferedReader(new InputStreamReader(PNginx.getInputStream()));
@@ -110,8 +112,7 @@ public class WindowsPHPNginxCore {
                 PPHP.waitFor();
                 System.out.println("Done.");
             }
-            main.getLogger().info("PHP Webserver started on:");
-            main.getLogger().info(main.getConfig().getString("Settings.ServerIP") + ":" + main.getConfig().getString("Settings.PHPPort"));
+
         } catch (IOException | InterruptedException e) {
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
         }

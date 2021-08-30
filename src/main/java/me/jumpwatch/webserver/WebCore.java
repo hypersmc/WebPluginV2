@@ -8,6 +8,8 @@ import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.CommandManager;
 import me.jumpwatch.webserver.utils.UpdateChecker;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.FileUtil;
@@ -214,6 +216,22 @@ public class WebCore extends JavaPlugin {
     }
 
     private void registerCommand(){
+        commandManager.register("", ((sender, params) -> {
 
+        }));
+    }
+
+
+    private static final class CommandValidate {
+        private static boolean notPlayer(CommandSender sender) {
+            if (!(sender instanceof Player))
+                sender.sendMessage("This command can only be executed by a player.");
+            return !(sender instanceof Player);
+        }
+        private static boolean console(CommandSender sender) {
+            if (sender instanceof Player)
+                sender.sendMessage("This command can only be executed in console.");
+            return (sender instanceof Player);
+        }
     }
 }
