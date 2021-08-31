@@ -2,6 +2,7 @@ package me.jumpwatch.webserver;
 
 import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
+import me.jumpwatch.webserver.php.linux.installers.LinuxInstaller;
 import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
 import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
 import me.jumpwatch.webserver.utils.CheckOS;
@@ -118,10 +119,16 @@ public class WebCore extends JavaPlugin {
             logger.info("SSL File doesn't exist!");
         }
         if (new File("plugins/WebPlugin/phpwindows").exists() && new File("plugins/WebPlugin/phpwindows/php").exists() && new File("plugins/WebPlugin/phpwindows/nginx").exists()) {
-            logger.info("Core PHP files exist!");
+            logger.info("Core Windows PHP files exist!");
         } else {
-            logger.info("Starting to download Files for Nginx and PHP");
+            logger.info("Starting to download Files for Nginx and PHP for Windows");
             WinInstaller.WindowsPHPNginxInstaller();
+        }
+        if (new File("plugins/WebPlugin/phplinux").exists() && new File("plugins/WebPlugin/phplinux/php").exists() && new File("plugins/WebPlugin/phplinux/nginx").exists()) {
+            logger.info("Core Linux PHP files exist!");
+        } else {
+          logger.info("Starting to download files for Nginx and PHP for Linux");
+            LinuxInstaller.LinuxPHPNginxInstaller();
         }
         if (getConfig().isSet("Settings.HTMLPORT")) {
             try {
