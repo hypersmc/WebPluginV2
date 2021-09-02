@@ -1,7 +1,7 @@
 package me.jumpwatch.webserver.php.linux.installers;
 
 import me.jumpwatch.webserver.WebCore;
-import net.java.truevfs.access.TFile;
+import me.jumpwatch.webserver.utils.TAR;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -34,7 +34,7 @@ public class LinuxPHPUnzipper {
     private static void Unzipper(String file, String output) {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
         try {
-            new TFile(file).cp_rp(new File(output));
+            TAR.extractTarArchive(new File(file), output);
         } catch (IOException e) {
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
         }

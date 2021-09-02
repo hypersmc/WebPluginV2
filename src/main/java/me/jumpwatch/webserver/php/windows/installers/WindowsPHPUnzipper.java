@@ -2,6 +2,7 @@ package me.jumpwatch.webserver.php.windows.installers;
 
 import me.jumpwatch.webserver.WebCore;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.*;
 import java.util.zip.ZipEntry;
@@ -15,6 +16,7 @@ public class WindowsPHPUnzipper {
         String destDir = main.getDataFolder() + "/phpwindows/nginx/";
         try {
             unzip(zipFilePath, destDir);
+            main.getLogger().info("Windows Nginx unzipped!");
         } catch (IOException e) {
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
         }
@@ -26,7 +28,20 @@ public class WindowsPHPUnzipper {
         String destDir = main.getDataFolder() + "/phpwindows/php/";
         try {
             unzip(zipFilePath, destDir);
+            main.getLogger().info("Windows PHP unzipped!");
         } catch (IOException e) {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    main.getLogger().info("Retrying Windows PHP unzipping!");
+                    try {
+                        unzip(zipFilePath, destDir);
+                    } catch (IOException ex) {
+                        if (main.getConfig().getBoolean("Settings.debug")) ex.printStackTrace();
+
+                    }
+                }
+            }.runTaskLater(main, 100L);
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
         }
     }

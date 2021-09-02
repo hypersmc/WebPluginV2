@@ -46,6 +46,7 @@
                         <goals>
                             <goal>copy-resources</goal>
                         </goals>
+
                         <configuration>
                             <outputDirectory>C:\Users\jespe\Desktop\testserver\plugins</outputDirectory>
                             <resources>
@@ -56,6 +57,7 @@
                                 </resource>
                             </resources>
                         </configuration>
+
                     </execution>
                 </executions>
             </plugin>
@@ -101,6 +103,11 @@
             <artifactId>spigot-api</artifactId>
             <version>1.17-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>1.20</version>
         </dependency>
 
     </dependencies>
