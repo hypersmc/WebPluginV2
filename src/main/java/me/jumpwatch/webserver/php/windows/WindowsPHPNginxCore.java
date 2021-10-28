@@ -122,6 +122,8 @@ public class WindowsPHPNginxCore {
         File Nginx = new File(core.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/nginx.exe");
         File NginxFolder = new File(core.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/");
         File PHPCoreFolder = new File(core.getDataFolder() + "/phpwindows/");
+
+
         try {
             Nginx.setExecutable(true, false);
             Nginx.setReadable(true, false);

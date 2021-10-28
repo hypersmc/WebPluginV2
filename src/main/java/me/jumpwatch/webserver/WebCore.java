@@ -10,8 +10,13 @@ import me.jumpwatch.webserver.utils.CommandManager;
 import me.jumpwatch.webserver.utils.UpdateChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Particle;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.FileUtil;
@@ -72,7 +77,7 @@ public class WebCore extends JavaPlugin {
             getConfig().options().copyDefaults();
             saveDefaultConfig();
         }else if ((getConfig().contains("ConfigVersion")) && (getConfig().getInt("ConfigVersion") != version)) {
-            this.getLogger().warning("Config is not right. Config was missing an update or you changed it!");
+            this.getLogger().warning("Config is not right. Config is missing an update or you changed it!");
             this.getLogger().info("An backup will be made.");
             File backup = new File(getDataFolder(), "config.yml");
             this.getLogger().info("Making backup");
@@ -156,7 +161,7 @@ public class WebCore extends JavaPlugin {
             Startwebserver();
         }
         if (CheckOS.isUnix()) {
-            logger.info("Linux PHP is currently not being developed on as i'm looking into alternatives to make it work correct.");
+            logger.info("Linux PHP is currently being developed on.");
         }
     }
 
@@ -223,6 +228,7 @@ public class WebCore extends JavaPlugin {
                     WindowsPHPNginxCore.StartWindowsNginxandPHP();
                 }
             }.runTaskAsynchronously(this);
+
         }
     }
 
@@ -346,9 +352,30 @@ public class WebCore extends JavaPlugin {
             return " and the newest version is: " + ChatColor.RED + ver;
         }
     }
+    public static void FilesPermissionsCheckWindows(WebCore core){
+        File phpin1 = new File(core.getDataFolder() + "phplinux/php/php-8.0.10/./build");
+        File phpin2 = new File(core.getDataFolder() + "phplinux/php/php-8.0.10/./build/shtool");
+        String phpin3 = "chmod u+x plugins/WebPlugin/phplinux/php/php-8.0.10/";
+        try {
+            phpin1.setExecutable(true, false);
+            phpin1.setReadable(true, false);
+            phpin1.setWritable(true, false);
+            phpin2.setExecutable(true, false);
+            phpin2.setReadable(true, false);
+            phpin2.setWritable(true, false);
+            Process pro = Runtime.getRuntime().exec(phpin3);
+            core.getLogger().info("File permission check success!");
+        } catch (Exception e) {
+            core.getLogger().info("Failed to check permissions! Please enable debug mode and report back to me (dev)");
+            if (core.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
+
+        }
+    }
 
 
-    private static final class CommandValidate {
+
+
+        private static final class CommandValidate {
         private static boolean notPlayer(CommandSender sender) {
             if (!(sender instanceof Player))
                 sender.sendMessage("This command can only be executed by a player.");
@@ -360,4 +387,5 @@ public class WebCore extends JavaPlugin {
             return (sender instanceof Player);
         }
     }
+
 }
