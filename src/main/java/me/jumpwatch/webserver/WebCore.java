@@ -133,7 +133,11 @@ public class WebCore extends JavaPlugin {
             logger.info("Core Linux PHP files exist!");
         } else {
           logger.info("Starting to download files for Nginx and PHP for Linux");
-            LinuxInstaller.LinuxPHPNginxInstaller();
+            try {
+                LinuxInstaller.LinuxPHPNginxInstaller();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         if (getConfig().isSet("Settings.HTMLPORT")) {
             try {
@@ -352,11 +356,15 @@ public class WebCore extends JavaPlugin {
             return " and the newest version is: " + ChatColor.RED + ver;
         }
     }
-    public static void FilesPermissionsCheckWindows(WebCore core){
-        File phpin1 = new File(core.getDataFolder() + "phplinux/php/php-8.0.10/./build");
-        File phpin2 = new File(core.getDataFolder() + "phplinux/php/php-8.0.10/./build/shtool");
-        String phpin3 = "chmod u+x plugins/WebPlugin/phplinux/php/php-8.0.10/";
+    public static void FilesPermissionsCheckLinux(WebCore core){
+        File phpin1 = new File(core.getDataFolder() + "/phplinux/php/php-8.0.10/./build");
+        File phpin2 = new File(core.getDataFolder() + "/phplinux/php/php-8.0.10/./build/shtool");
+        String phpin3 = "sudo chmod a+x " + core.getDataFolder() + "/phplinux/php/php-8.0.10/";
+        String perms1 = "sudo chmod a+x " + core.getDataFolder() + "/phplinux/php/php-8.0.10/./build/shtool";
+        String perms2 = "sudo chmod a+x " + core.getDataFolder() + "/phplinux/php/php-8.0.10/./build";
+        String FULL = "sudo chown -R root:root " + core.getDataFolder() + "/phplinux/php/php-8.0.10/*";
         try {
+            core.getLogger().info("Trying to set permissions for Linux");
             phpin1.setExecutable(true, false);
             phpin1.setReadable(true, false);
             phpin1.setWritable(true, false);
@@ -364,6 +372,15 @@ public class WebCore extends JavaPlugin {
             phpin2.setReadable(true, false);
             phpin2.setWritable(true, false);
             Process pro = Runtime.getRuntime().exec(phpin3);
+            Process pro2 = Runtime.getRuntime().exec(perms1);
+            Process pro3 = Runtime.getRuntime().exec(perms2);
+            try {
+                core.getLogger().info("Trying to set full permissions to ROOT");
+                Process FULl = Runtime.getRuntime().exec(FULL);
+            } catch (Exception e) {
+                core.getLogger().info("Failure to give full permissions to ROOT");
+                if (core.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
+            }
             core.getLogger().info("File permission check success!");
         } catch (Exception e) {
             core.getLogger().info("Failed to check permissions! Please enable debug mode and report back to me (dev)");

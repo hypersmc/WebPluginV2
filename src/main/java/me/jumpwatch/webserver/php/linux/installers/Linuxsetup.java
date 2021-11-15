@@ -8,7 +8,7 @@ import java.io.IOException;
 
 public class Linuxsetup {
     public static boolean donoproceed = false;
-    public static void setup(){
+    public static void setup() throws IOException {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
         File folder = new File(main.getDataFolder() + "/phplinux/php/php-8.0.10/");
 
@@ -20,6 +20,7 @@ public class Linuxsetup {
         String sqlite = "apt -y install libsqlite3-dev";
         String zliblg = "apt -y install zliblg-dev";
         String make = "apt -y install make";
+        String sudo = "apt -y install sudo";
         main.getLogger().info("Trying to install every dependencies!");
         try{
             main.getLogger().info("Trying to install linux updates!");
@@ -36,6 +37,8 @@ public class Linuxsetup {
             Process zlib = Runtime.getRuntime().exec(zliblg);
             main.getLogger().info("Trying to install make!");
             Process maker = Runtime.getRuntime().exec(make);
+            main.getLogger().info("Trying to install sudo!");
+            Process sudos = Runtime.getRuntime().exec(sudo);
         } catch (Exception e) {
             main.getLogger().warning("FAILED to install dependencies");
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
@@ -45,12 +48,18 @@ public class Linuxsetup {
             runsetup();
         }
     }
-    public static void runsetup(){
+    public static void runsetup() throws IOException {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String runphpsetup = main.getDataFolder() + "/phplinux/php/php-8.0.10/ bash ./configure --enable-fpm --with-mysqli";
-        String runmaker = main.getDataFolder() + "/phplinux/php/php-8.0.10/ make install";
+        ProcessBuilder processBuilder = new ProcessBuilder();
+        ProcessBuilder processBuilder2 = new ProcessBuilder();
+
+        processBuilder.command("sudo bash ./configure", "--enable-fpm", "--with-mysqli");
+        processBuilder.directory(new File(main.getDataFolder() + "/phplinux/php/php-8.0.10/"));
+        processBuilder2.command("sudo make install");
+        processBuilder2.directory(new File(main.getDataFolder() + "/phplinux/php/php-8.0.10/"));
+        main.getLogger().info(processBuilder.directory().getPath());
         try {
-            Process runphp = Runtime.getRuntime().exec(runphpsetup);
+            Process p1 = processBuilder.start();
         } catch (IOException e) {
             main.getLogger().warning("FAILED to run php configuring");
             donoproceed = true;
@@ -58,7 +67,7 @@ public class Linuxsetup {
         }
         if (!donoproceed){
             try {
-                Process runmakk = Runtime.getRuntime().exec(runmaker);
+                Process p2 = processBuilder2.start();
             } catch (IOException e) {
                 main.getLogger().warning("FAILED to run make install");
                 donoproceed = true;
