@@ -2,6 +2,7 @@ package me.jumpwatch.webserver;
 
 import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
+import me.jumpwatch.webserver.php.linux.LinuxPHPNginxCore;
 import me.jumpwatch.webserver.php.linux.installers.LinuxInstaller;
 import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
 import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
@@ -165,7 +166,12 @@ public class WebCore extends JavaPlugin {
             Startwebserver();
         }
         if (CheckOS.isUnix()) {
-            logger.info("Linux PHP is currently being developed on.");
+            if (!CheckOS.isRunningInsideDocker()) {
+                logger.info("You are currently running " + this.getName() + " in a linux machine but not dockerd!");
+                logger.info("For reasons you will NEED to run the server in a docker container so it can install everything.");
+            }else{
+                Startwebserver();
+            }
         }
     }
 
@@ -192,6 +198,8 @@ public class WebCore extends JavaPlugin {
         if (getConfig().getBoolean("Settings.EnablePHP")) {
             if (CheckOS.isWindows()) {
                 WindowsPHPNginxCore.StopWindowsNginxandPHP();
+            }else if (CheckOS.isUnix()) {
+                //LinuxPHPNginxCore
             }
         }
     }
