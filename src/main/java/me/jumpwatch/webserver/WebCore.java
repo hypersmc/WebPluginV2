@@ -6,6 +6,7 @@ import me.jumpwatch.webserver.php.linux.LinuxPHPNginxCore;
 import me.jumpwatch.webserver.php.linux.installers.LinuxInstaller;
 import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
 import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
+import me.jumpwatch.webserver.utils.AutoJKS;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.CommandManager;
 import me.jumpwatch.webserver.utils.UpdateChecker;
@@ -29,10 +30,13 @@ import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.CertificateException;
 import java.util.logging.Logger;
 
 public class WebCore extends JavaPlugin {
-    private boolean debug;
+    private boolean debug = this.getConfig().getBoolean("Settings.debug");
     public static String prefix = ChatColor.translateAlternateColorCodes('&', "&7[&3&lWebPlugin&7]&r");
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
@@ -42,7 +46,7 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 5;
+    private int version = 6;
     private CommandManager commandManager;
     private synchronized boolean getAcceptorRunning() {
         return acceptorRunning;
@@ -63,37 +67,22 @@ public class WebCore extends JavaPlugin {
         saveResource("html/assets/js/skel.min.js", false);
         saveResource("html/images/bg.jpg", false);
     }
+
     @Override
     public void onEnable() {
         this.shutdown = false;
         this.getLogger().info("Current OS: " + CheckOS.OS);
-        if (!(getConfig().contains("ConfigVersion", true))) {
-            this.getLogger().warning("No config version found. Either config corrupt or never existed.");
-            this.getLogger().info("In case on existed backup is being made.");
-            File backup = new File(getDataFolder(), "config.yml");
-            this.getLogger().info("Making backup");
-            FileUtil.copy(backup, new File(backup + ".backup"));
-            backup.delete();
-            this.getLogger().info("Creating config from internal storage.");
-            getConfig().options().copyDefaults();
-            saveDefaultConfig();
-        }else if ((getConfig().contains("ConfigVersion")) && (getConfig().getInt("ConfigVersion") != version)) {
-            this.getLogger().warning("Config is not right. Config is missing an update or you changed it!");
-            this.getLogger().info("An backup will be made.");
-            File backup = new File(getDataFolder(), "config.yml");
-            this.getLogger().info("Making backup");
-            FileUtil.copy(backup, new File(backup + ".backup"));
-            backup.delete();
-            this.getLogger().info("Done!");
-            this.getLogger().info("config was not up to date.");
-            this.getLogger().info("RECREATING");
-            saveResource("config.yml", true);
-        }else {
-            this.getLogger().info("Config up to date!");
-        }
+        configcontrol();
         getConfig().options().copyDefaults();
         saveDefaultConfig();
         Logger logger = this.getLogger();
+        if (this.getConfig().getBoolean("Settings.Autokey")){
+            try {
+                AutoJKS.makeJKS();
+            } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
+                e.printStackTrace();
+            }
+        }
         new UpdateChecker(this, 85640).getVersion(version -> {
             if (this.getDescription().getVersion().equalsIgnoreCase(version)) {
                 logger.info("There is no new update available.");
@@ -170,7 +159,7 @@ public class WebCore extends JavaPlugin {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not dockerd!");
                 logger.info("For reasons you will NEED to run the server in a docker container so it can install everything.");
             }else{
-                Startwebserver();
+                //Startwebserver();
             }
         }
     }
@@ -262,24 +251,28 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }));
+
         commandManager.register("stopweb", ((sender, params) -> {
             if (sender.hasPermission("web.stop") || sender.hasPermission("web.*")) {
                 WindowsPHPNginxCore.StopWindowsNginxandPHP();
                 sender.sendMessage(prefix + " Stopped webserver (PHP)");
             }
         }));
+
         commandManager.register("startweb", ((sender, params) -> {
             if (sender.hasPermission("web.start") || sender.hasPermission("web.*")) {
                 WindowsPHPNginxCore.StartWindowsNginxandPHP();
                 sender.sendMessage(prefix + " Started webserver (PHP)");
             }
         }));
+
         commandManager.register("reloadweb", ((sender, params) -> {
             if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
                 WindowsPHPNginxCore.reloadWindowsNginxandPHP();
                 sender.sendMessage(prefix + " Reloaded webserver (PHP)");
             }
         }));
+
         commandManager.register("reload", ((sender, params) -> {
             if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
                 reloadConfig();
@@ -290,6 +283,7 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }));
+
         commandManager.register("dev", ((sender, params) -> {
             if (sender.hasPermission("web.dev") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " This plugin is developed by " + getDescription().getAuthors());
@@ -300,6 +294,7 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }));
+
         commandManager.register("ver", ((sender, params) -> {
             if (sender.hasPermission("web.ver") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " Your running version: " + ChatColor.RED + getDescription().getVersion() + ChatColor.RESET + getver());
@@ -309,6 +304,7 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }));
+
         commandManager.register("reset", ((sender, params) -> {
             if (CommandValidate.console(sender)) return;
             if (params.length == 0){
@@ -323,9 +319,6 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }));
-
-
-
 
         commandManager.register("", ((sender, params) -> {
             if (!(sender instanceof Player)){
@@ -343,6 +336,33 @@ public class WebCore extends JavaPlugin {
                 }
             }
         }));
+    }
+
+    public void configcontrol(){
+        if (!(getConfig().contains("ConfigVersion", true))) {
+            this.getLogger().warning("No config version found. Either config corrupt or never existed.");
+            this.getLogger().info("In case on existed backup is being made.");
+            File backup = new File(getDataFolder(), "config.yml");
+            this.getLogger().info("Making backup");
+            FileUtil.copy(backup, new File(backup + ".backup"));
+            backup.delete();
+            this.getLogger().info("Creating config from internal storage.");
+            getConfig().options().copyDefaults();
+            saveDefaultConfig();
+        }else if ((getConfig().contains("ConfigVersion")) && (getConfig().getInt("ConfigVersion") != version)) {
+            this.getLogger().warning("Config is not right. Config is missing an update or you changed it!");
+            this.getLogger().info("An backup will be made.");
+            File backup = new File(getDataFolder(), "config.yml");
+            this.getLogger().info("Making backup");
+            FileUtil.copy(backup, new File(backup + ".backup"));
+            backup.delete();
+            this.getLogger().info("Done!");
+            this.getLogger().info("config was not up to date.");
+            this.getLogger().info("RECREATING");
+            saveResource("config.yml", true);
+        }else {
+            this.getLogger().info("Config up to date!");
+        }
     }
 
     public void resetconfig(Player sender){
@@ -364,6 +384,7 @@ public class WebCore extends JavaPlugin {
             return " and the newest version is: " + ChatColor.RED + ver;
         }
     }
+
     public static void FilesPermissionsCheckLinux(WebCore core){
         File phpin1 = new File(core.getDataFolder() + "/phplinux/php/php-8.0.10/./build");
         File phpin2 = new File(core.getDataFolder() + "/phplinux/php/php-8.0.10/./build/shtool");
@@ -397,10 +418,7 @@ public class WebCore extends JavaPlugin {
         }
     }
 
-
-
-
-        private static final class CommandValidate {
+    private static final class CommandValidate {
         private static boolean notPlayer(CommandSender sender) {
             if (!(sender instanceof Player))
                 sender.sendMessage("This command can only be executed by a player.");

@@ -26,7 +26,7 @@ public class WindowsPHPGetter {
 
     public static void WindowsPHPGetter(){
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String url = "https://windows.php.net/downloads/releases/php-8.0.10-Win32-vs16-x86.zip";
+        String url = "https://windows.php.net/downloads/releases/php-8.1.4-Win32-vs16-x86.zip";
         try {
             File dir = new File(main.getDataFolder() + "/tmpfiles/");
             dir.mkdirs();

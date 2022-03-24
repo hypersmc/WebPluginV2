@@ -28,7 +28,6 @@ public class NoneSSLHtml extends Thread{
             StringTokenizer parse = new StringTokenizer(input);
             String method = parse.nextToken().toUpperCase();
             fileRequested = parse.nextToken().toLowerCase();
-            String contentMimeType = "text/html";
             String s;
             int counter = 0, contentLength = 0;
             try {
@@ -60,6 +59,27 @@ public class NoneSSLHtml extends Thread{
             int fileLength = (int) file.length();
             String content = getContentType(fileRequested);
             if (method.equals("GET")) { // GET method so we return content
+                try {
+
+                    byte[] fileData = readFileData(file, fileLength);
+
+                    // send HTTP Headers
+                    out.write("HTTP/1.1 200 OK");
+                    out.write("Server: Java HTTP Server from SSaurel : 1.0");
+                    out.println("Set-Cookie: Max-Age=0; Secure; HttpOnly");
+                    out.println("Date: " + new Date());
+                    out.println("Content-type: " + content);
+
+                    out.println(); // blank line between headers and content, very important !
+                    out.flush(); // flush character output stream buffer
+
+                    dataOut.write(fileData, 0, fileLength);
+                    dataOut.flush();
+                }catch (IOException e) {
+                    main.getServer().getLogger().info("This is not an error and should not be reported.");
+                    main.getServer().getLogger().info("Writing failed!");
+                }
+            }else if (method.equals("POST")) { // POST method so we return stuff.
                 try {
 
                     byte[] fileData = readFileData(file, fileLength);

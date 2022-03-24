@@ -17,6 +17,7 @@ Settings:
   debug: false #Only enable if I need debug logs.
   EnablePHP: false
   EnableHTML: true
+  Autokey: false #Only enable if you can't figure out to make a keystore key. The system will AUTOMATICALLY turn this setting to false this when key have been made.
 
 SSLSettings: #Headsup. For now the only way to get an ssl key is to use JKS (Keystore) This system is still very early and might not even work.
   EnableSSL: false
@@ -30,4 +31,4 @@ SSLSettings: #Headsup. For now the only way to get an ssl key is to use JKS (Key
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 5
+ConfigVersion: 6

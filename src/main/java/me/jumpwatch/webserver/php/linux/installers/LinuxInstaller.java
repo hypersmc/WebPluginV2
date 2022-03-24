@@ -14,7 +14,12 @@ public class LinuxInstaller {
         LinuxPHPGetter.LinuxPHPGetter();
         LinuxPHPGetter.LinuxNginxGetter();
         if (CheckOS.isUnix()){
-            Linuxsetup.setup();
+            if (CheckOS.isRunningInsideDocker()) {
+                Linuxsetup.setup();
+            }else {
+                main.getLogger().info("You are currently running " + main.getName() + " in a linux machine but not dockerd!");
+                main.getLogger().info("For reasons you will NEED to run the server in a docker container so it can install everything.");
+            }
         }
     }
 }
