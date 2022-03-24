@@ -254,22 +254,52 @@ public class WebCore extends JavaPlugin {
 
         commandManager.register("stopweb", ((sender, params) -> {
             if (sender.hasPermission("web.stop") || sender.hasPermission("web.*")) {
-                WindowsPHPNginxCore.StopWindowsNginxandPHP();
-                sender.sendMessage(prefix + " Stopped webserver (PHP)");
+                if (CheckOS.isWindows()) {
+                    WindowsPHPNginxCore.StopWindowsNginxandPHP();
+                    sender.sendMessage(prefix + " Stopped webserver (PHP)");
+                }
+                if (CheckOS.isUnix()) {
+                    if (CheckOS.isRunningInsideDocker()){
+                        sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
+                    }else {
+                        sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
+
+                    }
+                }
             }
         }));
 
         commandManager.register("startweb", ((sender, params) -> {
             if (sender.hasPermission("web.start") || sender.hasPermission("web.*")) {
-                WindowsPHPNginxCore.StartWindowsNginxandPHP();
-                sender.sendMessage(prefix + " Started webserver (PHP)");
+                if (CheckOS.isWindows()) {
+                    WindowsPHPNginxCore.StartWindowsNginxandPHP();
+                    sender.sendMessage(prefix + " Started webserver (PHP)");
+                }
+                if (CheckOS.isUnix()) {
+                    if (CheckOS.isRunningInsideDocker()){
+                        sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
+                    }else {
+                        sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
+
+                    }
+                }
             }
         }));
 
         commandManager.register("reloadweb", ((sender, params) -> {
             if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
-                WindowsPHPNginxCore.reloadWindowsNginxandPHP();
-                sender.sendMessage(prefix + " Reloaded webserver (PHP)");
+                if (CheckOS.isWindows()) {
+                    WindowsPHPNginxCore.reloadWindowsNginxandPHP();
+                    sender.sendMessage(prefix + " Reloaded webserver (PHP)");
+                }
+                if (CheckOS.isUnix()) {
+                    if (CheckOS.isRunningInsideDocker()){
+                        sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
+                    }else {
+                        sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
+
+                    }
+                }
             }
         }));
 

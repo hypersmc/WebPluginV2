@@ -9,7 +9,6 @@ import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
-import java.util.HashSet;
 import java.util.Random;
 import java.util.UUID;
 
@@ -47,7 +46,7 @@ public class AutoJKS {
     }
     public static String generateString() {
         String uuid = UUID.randomUUID().toString();
-        return "uuid = " + uuid;
+        return uuid;
     }
 
 }
