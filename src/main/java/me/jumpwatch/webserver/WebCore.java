@@ -72,6 +72,7 @@ public class WebCore extends JavaPlugin {
     public void onEnable() {
         this.shutdown = false;
         this.getLogger().info("Current OS: " + CheckOS.OS);
+        this.getLogger().info("Is running Docker: " + CheckOS.isRunningInsideDocker());
         configcontrol();
         getConfig().options().copyDefaults();
         saveDefaultConfig();
@@ -105,6 +106,9 @@ public class WebCore extends JavaPlugin {
             logger.info("Making!");
             if (!new File(getDataFolder() + "/SSL/", "removeme.txt").exists()) {
                 saveResource("ssl/removeme.txt", false);
+                File removeme = new File("ssl/removeme.txt");
+                removeme.delete();
+
             }
         }
 
@@ -113,20 +117,30 @@ public class WebCore extends JavaPlugin {
         } else {
             logger.info("SSL File doesn't exist!");
         }
-        if (new File("plugins/WebPlugin/phpwindows").exists() && new File("plugins/WebPlugin/phpwindows/php").exists() && new File("plugins/WebPlugin/phpwindows/nginx").exists()) {
-            logger.info("Core Windows PHP files exist!");
-        } else {
-            logger.info("Starting to download Files for Nginx and PHP for Windows");
-            WinInstaller.WindowsPHPNginxInstaller();
+
+        if (CheckOS.isWindows()) {
+            if (new File("plugins/WebPlugin/phpwindows").exists() && new File("plugins/WebPlugin/phpwindows/php").exists() && new File("plugins/WebPlugin/phpwindows/nginx").exists()) {
+                logger.info("Core Windows PHP files exist!");
+            } else {
+                logger.info("Starting to download Files for Nginx and PHP for Windows");
+                try {
+                    WinInstaller.WindowsPHPNginxInstaller();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
+            }
         }
-        if (new File("plugins/WebPlugin/phplinux").exists() && new File("plugins/WebPlugin/phplinux/php").exists() && new File("plugins/WebPlugin/phplinux/nginx").exists()) {
-            logger.info("Core Linux PHP files exist!");
-        } else {
-          logger.info("Starting to download files for Nginx and PHP for Linux");
-            try {
-                LinuxInstaller.LinuxPHPNginxInstaller();
-            } catch (IOException e) {
-                e.printStackTrace();
+        if (CheckOS.isUnix()) {
+            if (new File("plugins/WebPlugin/phplinux").exists() && new File("plugins/WebPlugin/phplinux/php").exists() && new File("plugins/WebPlugin/phplinux/nginx").exists()) {
+                logger.info("Core Linux PHP files exist!");
+            } else {
+                logger.info("Starting to download files for Nginx and PHP for Linux");
+                try {
+                    LinuxInstaller.LinuxPHPNginxInstaller();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
         if (getConfig().isSet("Settings.HTMLPORT")) {
