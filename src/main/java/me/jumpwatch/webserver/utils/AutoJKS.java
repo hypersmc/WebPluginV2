@@ -20,17 +20,19 @@ public class AutoJKS {
 
         char[] password = generateRandomPassword(28).toCharArray();
         String name = generateString();
-        main.getConfig().set("SSLSettings.SSLJKSName", name);
-        main.getConfig().set("SSLSettings.SSLJKSPass", password);
-        main.getConfig().set("SSLSettings.SSLJKSKey", password);
-        main.reloadConfig();
-        main.saveConfig();
+
+        ConfigChanger.Changeconf(main.getDataFolder() + "/config.yml", "\"filename\"", name);
+        ConfigChanger.Changeconf(main.getDataFolder() + "/config.yml", "\"filepass\"", password.toString());
+        ConfigChanger.Changeconf(main.getDataFolder() + "/config.yml", "\"filekey\"", password.toString());
+        ConfigChanger.Changeconf(main.getDataFolder() + "/config.yml", "Autokey: true", "Autokey: false");
+        main.getLogger().info("JKS File name: " + name);
+        main.getLogger().info("JKS File password: " + password.toString());
         ks.load(null, password);
 
-        FileOutputStream fos = new FileOutputStream(main.getDataFolder() + "/ssl/" + name);
+        FileOutputStream fos = new FileOutputStream(main.getDataFolder() + "/ssl/" + name + ".jks");
         ks.store(fos, password);
         fos.close();
-        main.getConfig().set("Settings.Autokey", false);
+
     }
 
 

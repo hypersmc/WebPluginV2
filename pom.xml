@@ -48,7 +48,7 @@
                         </goals>
 
                         <configuration>
-                            <outputDirectory>C:\Users\jespe\Desktop\testserver\plugins</outputDirectory>
+                            <outputDirectory>C:\Users\jesp853b\Desktop\test server\plugins</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>${basedir}/target</directory>
