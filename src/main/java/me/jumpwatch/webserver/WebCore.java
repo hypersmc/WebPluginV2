@@ -32,6 +32,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.logging.Logger;
 
@@ -80,19 +81,18 @@ public class WebCore extends JavaPlugin {
         if (this.getConfig().getBoolean("Settings.Autokey")){
             try {
                 AutoJKS.makeJKS();
-            } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
+            } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException | UnrecoverableEntryException e) {
                 e.printStackTrace();
             }
         }
         new UpdateChecker(this, 85640).getVersion(version -> {
             if (this.getDescription().getVersion().equalsIgnoreCase(version)) {
                 logger.info("There is no new update available.");
-                ver = version;
             }else{
                 logger.info("There is a new update available!");
                 logger.info("Your version is " + this.getDescription().getVersion() + " newest version " + version);
-                ver = version;
             }
+            ver = version;
         });
         commandManager = new CommandManager(this, "WebP");
         registerCommand();
@@ -170,7 +170,7 @@ public class WebCore extends JavaPlugin {
         }
         if (CheckOS.isUnix()) {
             if (!CheckOS.isRunningInsideDocker()) {
-                logger.info("You are currently running " + this.getName() + " in a linux machine but not dockerd!");
+                logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
                 logger.info("For reasons you will NEED to run the server in a docker container so it can install everything.");
             }else{
                 //Startwebserver();
@@ -180,6 +180,7 @@ public class WebCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        Bukkit.getScheduler().cancelTasks(this);
         this.shutdown = true;
         acceptorRunning = false;
         Socket sockCloser;
@@ -259,10 +260,8 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " /webp startweb (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp reloadweb (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp reset (ONLY works in console!)");
-                return;
             } else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
-                return;
             }
         }));
 
@@ -321,10 +320,8 @@ public class WebCore extends JavaPlugin {
             if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
                 reloadConfig();
                 sender.sendMessage(prefix + " Configuration file reloaded.");
-                return;
             }else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
-                return;
             }
         }));
 
@@ -332,20 +329,16 @@ public class WebCore extends JavaPlugin {
             if (sender.hasPermission("web.dev") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " This plugin is developed by " + getDescription().getAuthors());
                 sender.sendMessage(prefix + " Your running version: " + ChatColor.RED + getDescription().getVersion());
-                return;
             }else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
-                return;
             }
         }));
 
         commandManager.register("ver", ((sender, params) -> {
             if (sender.hasPermission("web.ver") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " Your running version: " + ChatColor.RED + getDescription().getVersion() + ChatColor.RESET + getver());
-                return;
             }else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
-                return;
             }
         }));
 
@@ -360,7 +353,6 @@ public class WebCore extends JavaPlugin {
             if (params.length == 1) {
                 sender.sendMessage(prefix + " Starting config reset!");
                 resetconfig(((Player) sender).getPlayer());
-                return;
             }
         }));
 
