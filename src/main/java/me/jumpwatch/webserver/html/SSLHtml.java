@@ -46,33 +46,33 @@ public class SSLHtml {
 
         try (var serverSocket = getServerSocket(address)) {
 
-
-            var encoding = StandardCharsets.UTF_8;
+            BufferedReader in = null;
 
 
             while (true) {
                 try (var socket = serverSocket.accept();
                      var reader = new BufferedReader(new InputStreamReader(
-                             socket.getInputStream(), encoding.name()));
+                             socket.getInputStream()));
 
                      var writer = new BufferedWriter(new OutputStreamWriter(
-                             socket.getOutputStream(), encoding.name()))
+                             socket.getOutputStream()))
                 ) {
                     String DEFAULT_FAIL = "index.html";
                     String fileRequested = null;
 
+                    in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-                    String input = reader.readLine();
+                    String input = in.readLine();
                     StringTokenizer parse = new StringTokenizer(input);
                     fileRequested = parse.nextToken().toLowerCase();
                     String contentMimeType = "text/html";
                     String s2;
                     int counter = 0, contentLength = 0;
                     try {
-                        while (!(s2 = reader.readLine()).equalsIgnoreCase("")){
+                        while (!(s2 = in.readLine()).equalsIgnoreCase("")){
                             if (counter == 0 && s2.equalsIgnoreCase(WebCore.closeConnection)) {
 
-                                reader.close();
+                                in.close();
                                 writer.close();
                                 return;
                             }
@@ -92,9 +92,7 @@ public class SSLHtml {
                     if (fileRequested.endsWith("/")) {
                         fileRequested += DEFAULT_FAIL;
                     }
-                    //getHeaderLines(reader).forEach(System.out::println);
-
-                    File file = new File(main.getDataFolder() + "/html/index.html");
+                    File file = new File(main.getDataFolder() + "/html/" + fileRequested);
                     int fileLength = (int) file.length();
                     String content = getContentType(fileRequested);
 
@@ -102,11 +100,12 @@ public class SSLHtml {
 
                     try {
                         byte[] fileData = readFileData(file, fileLength);
-                        writer.write("Server: Java HTTP Server from SSaurel : 1.0");
-                        writer.write(getResponse(encoding, fileLength, content));
+
+                        writer.write("HTTP/1.1 200 OK");
+                        writer.write("Content-Length: " + contentLength);
+                        writer.write("Content-Type: " + content);
                         writer.newLine();
                         writer.flush();
-
                         dataOut.write(fileData, 0, fileLength);
                         dataOut.flush();
                     } catch (IOException e) {
@@ -201,11 +200,8 @@ public class SSLHtml {
 
 
         return "HTTP/1.1 200 OK\r\n" +
-                String.format("Content-Length: %d\r\n", contentLength) +
-                String.format("Content-Type: " + content + " charset=%s\r\n",
-                        encoding.displayName()) +
-                // An empty line marks the end of the response's header
-                "\r\n";
+                String.format("Content-Length: " + contentLength) +
+                String.format("Content-Type: " + content);
     }
 
     private static List<String> getHeaderLines(BufferedReader reader)
