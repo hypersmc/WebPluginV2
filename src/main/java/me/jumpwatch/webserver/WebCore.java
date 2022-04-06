@@ -49,6 +49,7 @@ public class WebCore extends JavaPlugin {
     public static String ver;
     private int version = 6;
     private CommandManager commandManager;
+
     private synchronized boolean getAcceptorRunning() {
         return acceptorRunning;
     }
@@ -180,7 +181,7 @@ public class WebCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        Bukkit.getScheduler().cancelTasks(this);
+        Bukkit.getScheduler().cancelTasks(m);
         this.shutdown = true;
         acceptorRunning = false;
         Socket sockCloser;
@@ -217,7 +218,7 @@ public class WebCore extends JavaPlugin {
                     public void run(){
                         new SSLHtml().run();
                     }
-                }.runTaskAsynchronously(this);
+                }.runTaskAsynchronously(this).getTaskId() ;
             }else{
                 acceptor = new Thread(new Runnable() {
                     @Override

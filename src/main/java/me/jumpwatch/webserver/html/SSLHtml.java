@@ -1,43 +1,33 @@
 package me.jumpwatch.webserver.html;
 
-import com.sun.net.httpserver.HttpsConfigurator;
-import com.sun.net.httpserver.HttpsParameters;
-import com.sun.net.httpserver.HttpsServer;
 import me.jumpwatch.webserver.WebCore;
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import javax.net.ssl.*;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
 import java.io.*;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.security.*;
-import java.security.cert.CertificateException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.StringTokenizer;
+import java.security.KeyStore;
+import java.util.*;
 
 public class SSLHtml {
     WebCore main = JavaPlugin.getPlugin(WebCore.class);
+    static String DEFAULT_FAIL = "index.html";
 
 
     public void run(){
         try {
             var address = new InetSocketAddress("localhost", main.getConfig().getInt("SSLSettings.SSLPort"));
             startSingleThreaded(address);
-
         } catch (Exception e) {
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
 
         }
     }
 
-    public static void startSingleThreaded(InetSocketAddress address) {
+    public void startSingleThreaded(InetSocketAddress address) {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
         System.out.println("Start single-threaded server at " + address);
         BufferedOutputStream dataOut = null;
@@ -47,7 +37,7 @@ public class SSLHtml {
         try (var serverSocket = getServerSocket(address)) {
 
             BufferedReader in = null;
-
+            String fileRequested = null;
 
             while (true) {
                 try (var socket = serverSocket.accept();
@@ -57,27 +47,28 @@ public class SSLHtml {
                      var writer = new BufferedWriter(new OutputStreamWriter(
                              socket.getOutputStream()))
                 ) {
-                    String DEFAULT_FAIL = "index.html";
-                    String fileRequested = null;
+
 
                     in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
                     String input = in.readLine();
                     StringTokenizer parse = new StringTokenizer(input);
+                    String method = parse.nextToken().toUpperCase();
                     fileRequested = parse.nextToken().toLowerCase();
-                    String contentMimeType = "text/html";
-                    String s2;
+                    String s;
                     int counter = 0, contentLength = 0;
                     try {
-                        while (!(s2 = in.readLine()).equalsIgnoreCase("")){
-                            if (counter == 0 && s2.equalsIgnoreCase(WebCore.closeConnection)) {
+                        while (!(s = in.readLine()).equals("")){
+                            if (counter == 0 && s.equalsIgnoreCase(WebCore.closeConnection)) {
 
                                 in.close();
                                 writer.close();
+                                dataOut.close();
+
                                 return;
                             }
-                            if (s2.startsWith("Content-Length: ")) {
-                                contentLength = Integer.parseInt(s2.split("Length: ")[1]);
+                            if (s.startsWith("Content-Length: ")) {
+                                contentLength = Integer.parseInt(s.split("Length: ")[1]);
                             }
                             counter++;
                         }
@@ -92,27 +83,49 @@ public class SSLHtml {
                     if (fileRequested.endsWith("/")) {
                         fileRequested += DEFAULT_FAIL;
                     }
-                    File file = new File(main.getDataFolder() + "/html/" + fileRequested);
+                    File file = new File(main.getDataFolder() + "/html/", fileRequested);
                     int fileLength = (int) file.length();
                     String content = getContentType(fileRequested);
 
                     dataOut = new BufferedOutputStream(socket.getOutputStream());
+                    if (method.equals("GET")) {
+                        try {
+                            byte[] fileData = readFileData(file, fileLength);
 
-                    try {
-                        byte[] fileData = readFileData(file, fileLength);
+                            writer.write("HTTP/1.1 200 OK\r\n");
+                            writer.write("Server: Java HTTP Server from SSaurel : 1.0\r\n");
+                            writer.write("Set-Cookie: Max-Age=0; Secure;\r\n");
+                            writer.write("Date: " + new Date() + "\r\n");
+                            writer.write("Content-type: " + content + "\r\n");
+                            writer.write("\r\n");
+                            writer.flush();
+                            dataOut.write(fileData, 0, fileLength);
+                            dataOut.flush();
+                        } catch (IOException e) {
+                            main.getServer().getLogger().info("This is not an error and should not be reported.");
+                            main.getServer().getLogger().info("Writing failed!");
+                        }
+                    }else if (method.equals("POST")) {
+                        try {
+                            byte[] fileData = readFileData(file, fileLength);
 
-                        writer.write("HTTP/1.1 200 OK");
-                        writer.write("Content-Length: " + contentLength);
-                        writer.write("Content-Type: " + content);
-                        writer.newLine();
-                        writer.flush();
-                        dataOut.write(fileData, 0, fileLength);
-                        dataOut.flush();
-                    } catch (IOException e) {
-                        main.getServer().getLogger().info("This is not an error and should not be reported.");
-                        main.getServer().getLogger().info("Writing failed!");
+                            writer.write("HTTP/1.1 200 OK\r\n");
+                            writer.write("Server: Java HTTP Server from SSaurel : 1.0\r\n");
+                            writer.write("Set-Cookie: Max-Age=0; Secure;\r\n");
+                            writer.write("Date: " + new Date() + "\r\n");
+                            writer.write("Content-type: " + content + "\r\n");
+                            writer.write("\r\n");
+                            writer.flush();
+                            dataOut.write(fileData, 0, fileLength);
+                            dataOut.flush();
+                        } catch (IOException e) {
+                            main.getServer().getLogger().info("This is not an error and should not be reported.");
+                            main.getServer().getLogger().info("Writing failed!");
+                        }
                     }
-
+                    writer.close();
+                    socket.close();
+                    dataOut.close();
 
                 } catch (IOException e) {
                     System.err.println("Exception while handling connection");
@@ -125,9 +138,13 @@ public class SSLHtml {
                     if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
 
                 }
+
             }
         } catch (Exception e) {
             System.err.println("Could not create socket at " + address);
+            main.getLogger().info("Restarting SSL systems!");
+            this.run();
+
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
 
         }
@@ -143,6 +160,9 @@ public class SSLHtml {
         } catch (IOException e){
             main.getServer().getLogger().info("This is not an error and should not be reported.");
             main.getServer().getLogger().info("File: " + file + " Could not be found!");
+        }finally {
+            if (fileIn != null)
+                fileIn.close();
         }
 
         return fileData;
@@ -169,9 +189,6 @@ public class SSLHtml {
 
         int backlog = 0;
 
-//        var keyStosrePath = Path.of("./keystore.jks");
-//        char[] keyStorePdassword = "pass_for_self_signed_cert".toCharArray();
-
         var serverSocket = getSslContext(Path.of(ksName), ksPass)
                 .getServerSocketFactory()
                 .createServerSocket(address.getPort(), backlog, address.getAddress());
@@ -196,13 +213,7 @@ public class SSLHtml {
         return sslContext;
     }
 
-    private static String getResponse(Charset encoding, int contentLength, String content) {
 
-
-        return "HTTP/1.1 200 OK\r\n" +
-                String.format("Content-Length: " + contentLength) +
-                String.format("Content-Type: " + content);
-    }
 
     private static List<String> getHeaderLines(BufferedReader reader)
             throws IOException {

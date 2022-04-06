@@ -6,7 +6,7 @@
 
     <groupId>org.example</groupId>
     <artifactId>WebPlugin</artifactId>
-    <version>1.5B</version>
+    <version>1.5R</version>
 
     <build>
         <defaultGoal>clean package</defaultGoal>

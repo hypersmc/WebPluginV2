@@ -1,6 +1,6 @@
 name: WebPlugin
 main: me.jumpwatch.webserver.WebCore
-version: 1.5B
+version: 1.5R
 api-version: 1.13
 description: Adds the abaility to have an intergrated webserver for your minecraft server.
 author:
