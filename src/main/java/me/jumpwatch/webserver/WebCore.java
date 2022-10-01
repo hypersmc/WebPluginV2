@@ -22,6 +22,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.FileUtil;
+import revxrsal.commands.annotation.Command;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -47,13 +48,16 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 6;
+    private int version = 8;
     private CommandManager commandManager;
 
     private synchronized boolean getAcceptorRunning() {
         return acceptorRunning;
     }
-    public void sethtmlfiles(){
+    private void setphpfiles(){
+        saveResource("php/index.php", false);
+    }
+    private void sethtmlfiles(){
         saveResource("html/index.html", false);
         saveResource("html/assets/css/font-awesome.min.css", false);
         saveResource("html/assets/css/main.css", false);
@@ -75,6 +79,9 @@ public class WebCore extends JavaPlugin {
         this.shutdown = false;
         this.getLogger().info("Current OS: " + CheckOS.OS);
         this.getLogger().info("Is running Docker: " + CheckOS.isRunningInsideDocker());
+        if (CheckOS.isUnix()){
+            this.getLogger().info("Trying to get Linux Distro name: " + CheckOS.getLinuxName());
+        }
         configcontrol();
         getConfig().options().copyDefaults();
         saveDefaultConfig();
@@ -86,19 +93,26 @@ public class WebCore extends JavaPlugin {
                 e.printStackTrace();
             }
         }
-        new UpdateChecker(this, 85640).getVersion(version -> {
-            if (this.getDescription().getVersion().equalsIgnoreCase(version)) {
-                logger.info("There is no new update available.");
-            }else{
-                logger.info("There is a new update available!");
-                logger.info("Your version is " + this.getDescription().getVersion() + " newest version " + version);
-            }
-            ver = version;
-        });
+        if (this.getDescription().getVersion().equalsIgnoreCase("devbuild")){
+            logger.info("This is a dev build! Please remind me on Discord that I uploaded a dev build :)");
+        }else {
+            new UpdateChecker(this, 85640).getVersion(version -> {
+                if (this.getDescription().getVersion().equalsIgnoreCase(version)) {
+                    logger.info("There is no new update available.");
+                } else {
+                    logger.info("There is a new update available!");
+                    logger.info("Your version is " + this.getDescription().getVersion() + " newest version " + version);
+                }
+                ver = version;
+            });
+        }
         commandManager = new CommandManager(this, "WebP");
         registerCommand();
         if (!(new File(getDataFolder() + "/html/").exists())) {
             sethtmlfiles();
+        }
+        if (!(new File(getDataFolder() + "/php/").exists())){
+            setphpfiles();
         }
         if (new File("plugins/WebPlugin/ssl/").exists()){
             logger.info("SSL Folder exist!");
@@ -167,18 +181,20 @@ public class WebCore extends JavaPlugin {
             }
         }
         if (CheckOS.isWindows()) {
-            Startwebserver();
+            Startwebserverhtml();
+            Startwebserverphp();
         }
         if (CheckOS.isUnix()) {
+            Startwebserverhtml();
+            LinuxPHPNginxCore.StartLinuxPHP();
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
                 logger.info("For reasons you will NEED to run the server in a docker container so it can install everything.");
             }else{
-                //Startwebserver();
+                //Startwebserverphp();
             }
         }
     }
-
     @Override
     public void onDisable() {
         Bukkit.getScheduler().cancelTasks(m);
@@ -208,8 +224,18 @@ public class WebCore extends JavaPlugin {
             }
         }
     }
+    private void Startwebserverphp(){
+        if (getConfig().getBoolean("Settings.EnablePHP")) {
+            new BukkitRunnable() {
+                @Override
+                public void run(){
+                    WindowsPHPNginxCore.StartWindowsNginxandPHP();
+                }
+            }.runTaskAsynchronously(this);
 
-    private void Startwebserver(){
+        }
+    }
+    private void Startwebserverhtml(){
         acceptorRunning = true;
         if (getConfig().getBoolean("Settings.EnableHTML")) {
             if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
@@ -238,15 +264,7 @@ public class WebCore extends JavaPlugin {
                 acceptor.start();
             }
         }
-        if (getConfig().getBoolean("Settings.EnablePHP")) {
-            new BukkitRunnable() {
-                @Override
-                public void run(){
-                    WindowsPHPNginxCore.StartWindowsNginxandPHP();
-                }
-            }.runTaskAsynchronously(this);
 
-        }
     }
 
     private void registerCommand(){
@@ -259,7 +277,7 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " /webp help to get this again.");
                 sender.sendMessage(prefix + " /webp stopweb (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp startweb (ONLY works if php is enabled!");
-                sender.sendMessage(prefix + " /webp reloadweb (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp webreload (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp reset (ONLY works in console!)");
             } else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
@@ -268,51 +286,63 @@ public class WebCore extends JavaPlugin {
 
         commandManager.register("stopweb", ((sender, params) -> {
             if (sender.hasPermission("web.stop") || sender.hasPermission("web.*")) {
-                if (CheckOS.isWindows()) {
-                    WindowsPHPNginxCore.StopWindowsNginxandPHP();
-                    sender.sendMessage(prefix + " Stopped webserver (PHP)");
-                }
-                if (CheckOS.isUnix()) {
-                    if (CheckOS.isRunningInsideDocker()){
-                        sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
-                    }else {
-                        sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
-
+                if (getConfig().getBoolean("Settings.EnablePHP")) {
+                    if (CheckOS.isWindows()) {
+                        WindowsPHPNginxCore.StopWindowsNginxandPHP();
+                        sender.sendMessage(prefix + " Stopped webserver (PHP)");
                     }
+                    if (CheckOS.isUnix()) {
+                        if (CheckOS.isRunningInsideDocker()){
+                            sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
+                        }else {
+                            sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
+
+                        }
+                    }
+                }else {
+                    sender.sendMessage(prefix + " PHP is not enabled!.");
                 }
             }
         }));
 
         commandManager.register("startweb", ((sender, params) -> {
             if (sender.hasPermission("web.start") || sender.hasPermission("web.*")) {
-                if (CheckOS.isWindows()) {
-                    WindowsPHPNginxCore.StartWindowsNginxandPHP();
-                    sender.sendMessage(prefix + " Started webserver (PHP)");
-                }
-                if (CheckOS.isUnix()) {
-                    if (CheckOS.isRunningInsideDocker()){
-                        sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
-                    }else {
-                        sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
-
+                if (getConfig().getBoolean("Settings.EnablePHP")) {
+                    if (CheckOS.isWindows()) {
+                        WindowsPHPNginxCore.StartWindowsNginxandPHP();
+                        sender.sendMessage(prefix + " Started webserver (PHP)");
                     }
+                    if (CheckOS.isUnix()) {
+                        if (CheckOS.isRunningInsideDocker()){
+                            sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
+                        }else {
+                            sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
+
+                        }
+                    }
+                }else {
+                    sender.sendMessage(prefix + " PHP is not enabled!.");
                 }
             }
         }));
 
-        commandManager.register("reloadweb", ((sender, params) -> {
-            if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
-                if (CheckOS.isWindows()) {
-                    WindowsPHPNginxCore.reloadWindowsNginxandPHP();
-                    sender.sendMessage(prefix + " Reloaded webserver (PHP)");
-                }
-                if (CheckOS.isUnix()) {
-                    if (CheckOS.isRunningInsideDocker()){
-                        sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
-                    }else {
-                        sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
-
+        commandManager.register("webreload", ((sender, params) -> {
+            if (sender.hasPermission("web.webreload") || sender.hasPermission("web.*")) {
+                if (getConfig().getBoolean("Settings.EnablePHP")) {
+                    if (CheckOS.isWindows()) {
+                        WindowsPHPNginxCore.reloadWindowsNginxandPHP();
+                        sender.sendMessage(prefix + " Reloaded webserver (PHP)");
                     }
+                    if (CheckOS.isUnix()) {
+                        if (CheckOS.isRunningInsideDocker()) {
+                            sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
+                        } else {
+                            sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
+
+                        }
+                    }
+                }else {
+                    sender.sendMessage(prefix + " PHP is not enabled!.");
                 }
             }
         }));
@@ -359,6 +389,19 @@ public class WebCore extends JavaPlugin {
 
         commandManager.register("", ((sender, params) -> {
             if (!(sender instanceof Player)){
+                if (getConfig().getString("Settings.ServerIP").equalsIgnoreCase("localhost")){
+                    sender.sendMessage(prefix + ChatColor.RED + " ServerIP not changed in config!");
+                    sender.sendMessage(prefix + " Webserver info: ");
+                    if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
+                        sender.sendMessage("");
+                    }
+                }else {
+                    sender.sendMessage(prefix + " Webserver info: ");
+                    if (getConfig().getBoolean("SSLSettings.EnableSSL")){
+
+                    }
+                }
+            }else{
                 if (getConfig().getString("Settings.ServerIP").equalsIgnoreCase("localhost")){
                     sender.sendMessage(prefix + ChatColor.RED + " ServerIP not changed in config!");
                     sender.sendMessage(prefix + " Webserver info: ");

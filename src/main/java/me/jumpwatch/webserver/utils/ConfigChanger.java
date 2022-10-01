@@ -48,8 +48,10 @@ public class ConfigChanger {
             {
                 //Closing the resources
 
+                assert reader != null;
                 reader.close();
 
+                assert writer != null;
                 writer.close();
             }
             catch (IOException e)

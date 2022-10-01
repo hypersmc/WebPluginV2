@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.example</groupId>
+    <groupId>org.WebPlugin</groupId>
     <artifactId>WebPlugin</artifactId>
-    <version>1.5R</version>
+    <version>1.9B</version>
 
     <build>
         <defaultGoal>clean package</defaultGoal>
@@ -72,6 +72,10 @@
 
     <repositories>
         <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+        <repository>
             <id>spigotmc-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
@@ -82,6 +86,10 @@
         <repository>
             <id>everything</id>
             <url>http://repo.citizensnpcs.co/</url>
+        </repository>
+        <repository>
+            <id>everything2</id>
+            <url>http://caucho.com/</url>
         </repository>
         <repository>
             <id>enginehub-maven</id>
@@ -95,21 +103,74 @@
             <id>rayzr-repo</id>
             <url>https://rayzr.dev/repo/</url>
         </repository>
+
+
+
     </repositories>
 
     <dependencies>
         <dependency>
             <groupId>org.spigotmc</groupId>
             <artifactId>spigot-api</artifactId>
-            <version>1.18.1-R0.1-SNAPSHOT</version>
+            <version>1.19-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-compress</artifactId>
-            <version>1.20</version>
+            <version>1.21</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.Revxrsal.Lamp</groupId>
+            <artifactId>common</artifactId>
+            <version>3.0.2</version>
+        </dependency>
+        <!--<dependency>
+            <groupId>com.decompiler1</groupId>
+            <artifactId>jd-core-java1</artifactId>
+            <version>1.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.decompiler2</groupId>
+            <artifactId>jd-core-java2</artifactId>
+            <version>1.2</version>
+        </dependency>-->
+        <dependency>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy-all</artifactId>
+            <version>2.4.21</version>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>3.8.2</version>
+        </dependency>
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>8.0.28</version>
+        </dependency>
+        <dependency>
+            <groupId>com.caucho2</groupId>
+            <artifactId>quercus2</artifactId>
+            <version>3.1</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.caucho</groupId>
+            <artifactId>resin</artifactId>
+            <version>4.0.66</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-core</artifactId>
+            <version>2.5.6</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <version>2.5.6</version>
+        </dependency>
     </dependencies>
 
 </project>

@@ -16,18 +16,20 @@ Settings:
   debug: false #Only enable if I need debug logs.
   EnablePHP: false
   EnableHTML: true
-  Autokey: false #Don't enable as it's still WIP. Only enable if you can't figure out to make a keystore key. The system will AUTOMATICALLY turn this setting to false this when key have been made.
+  Autokey: false #Don't enable as it's still WIP.
 
-SSLSettings: #Headsup. For now the only way to get an ssl key is to use JKS (Keystore) This system is still very early and might not even work.
+SSLSettings: #jks key required!
   EnableSSL: false
   SSLPort: 25570
   SSLJKSName: filename #Without .jks
   SSLJKSPass: filepass
   SSLJKSKey: filekey
-###To create an .jks key follow this
-# https://docs.oracle.com/cd/E19509-01/820-3503/ggfen/index.html
-###Be sure you do it right otherwise it wont work!
+###
+# While the self-signed key is nice and all I do recommend a lets-encrypt cert.
+# Read about how to make one and convert it from .pem to .jks here:
+# https://ordina-jworks.github.io/security/2019/08/14/Using-Lets-Encrypt-Certificates-In-Java.html#installing-a-lets-encrypt-certificate
+###
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 6
+ConfigVersion: 8

@@ -15,6 +15,8 @@ import java.util.*;
 public class SSLHtml {
     WebCore main = JavaPlugin.getPlugin(WebCore.class);
     static String DEFAULT_FAIL = "index.html";
+    private static int st = 1;
+    private static int fp = 5;
 
 
     public void run(){
@@ -141,11 +143,17 @@ public class SSLHtml {
 
             }
         } catch (Exception e) {
-            System.err.println("Could not create socket at " + address);
-            main.getLogger().info("Restarting SSL systems!");
-            this.run();
+            if (st < fp){
+                System.err.println("Could not create socket at " + address);
+                main.getLogger().info("Restarting SSL systems!");
+                this.run();
+                st = st + 1;
+                if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
+            }else {
+                main.getLogger().info("Max restarts exceeded. Please enable debug and view error");
+                return;
+            }
 
-            if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
 
         }
     }

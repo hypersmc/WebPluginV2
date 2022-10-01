@@ -6,7 +6,6 @@ import java.io.*;
 import java.net.Socket;
 import java.util.Date;
 import java.util.StringTokenizer;
-
 public class NoneSSLHtml extends Thread{
     Socket sock;
     WebCore main;
@@ -18,6 +17,7 @@ public class NoneSSLHtml extends Thread{
 
     @Override
     public void run() {
+
         BufferedReader in = null; PrintWriter out = null; BufferedOutputStream dataOut = null;
         String fileRequested = null;
         try {
@@ -111,6 +111,7 @@ public class NoneSSLHtml extends Thread{
 
     private byte[] readFileData(File file, int fileLength) throws IOException {
         FileInputStream fileIn = null;
+
         byte[] fileData = new byte[fileLength];
 
         try {
