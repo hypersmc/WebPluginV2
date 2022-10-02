@@ -88,8 +88,9 @@ public class WebCore extends JavaPlugin {
         Logger logger = this.getLogger();
         if (this.getConfig().getBoolean("Settings.Autokey")){
             try {
-                AutoJKS.makeJKS();
-            } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException | UnrecoverableEntryException e) {
+                AutoJKS.makeRSAkey();
+                //AutoJKS.makeJKS();
+            } catch (NoSuchAlgorithmException e) {
                 e.printStackTrace();
             }
         }
