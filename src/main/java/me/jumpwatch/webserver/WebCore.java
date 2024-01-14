@@ -1,28 +1,30 @@
+/*
+ * ******************************************************
+ *  *Copyright (c) 2020-2022. Jesper Henriksen mhypers@gmail.com
+ *
+ *  * This file is part of WebServer project
+ *  *
+ *  * WebServer can not be copied and/or distributed without the express
+ *  * permission of Jesper Henriksen
+ *  ******************************************************
+ */ 
 package me.jumpwatch.webserver;
 
 import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
-import me.jumpwatch.webserver.php.linux.LinuxPHPNginxCore;
-import me.jumpwatch.webserver.php.linux.installers.LinuxInstaller;
+import me.jumpwatch.webserver.php.linux.LinuxPHPCore;
 import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
 import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
-import me.jumpwatch.webserver.utils.AutoJKS;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.CommandManager;
 import me.jumpwatch.webserver.utils.UpdateChecker;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
-import org.bukkit.Particle;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.FileUtil;
-import revxrsal.commands.annotation.Command;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -30,11 +32,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableEntryException;
-import java.security.cert.CertificateException;
 import java.util.logging.Logger;
 
 public class WebCore extends JavaPlugin {
@@ -48,8 +45,9 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 8;
+    private int version = 10;
     private CommandManager commandManager;
+
 
     private synchronized boolean getAcceptorRunning() {
         return acceptorRunning;
@@ -59,19 +57,7 @@ public class WebCore extends JavaPlugin {
     }
     private void sethtmlfiles(){
         saveResource("html/index.html", false);
-        saveResource("html/assets/css/font-awesome.min.css", false);
-        saveResource("html/assets/css/main.css", false);
-        saveResource("html/assets/fonts/FontAwesome.otf", false);
-        saveResource("html/assets/fonts/fontawesome-webfont.eot", false);
-        saveResource("html/assets/fonts/fontawesome-webfont.svg", false);
-        saveResource("html/assets/fonts/fontawesome-webfont.ttf", false);
-        saveResource("html/assets/fonts/fontawesome-webfont.woff", false);
-        saveResource("html/assets/fonts/fontawesome-webfont.woff2", false);
-        saveResource("html/assets/js/jquery.min.js", false);
-        saveResource("html/assets/js/jquery.poptrox.min.js", false);
-        saveResource("html/assets/js/main.js", false);
-        saveResource("html/assets/js/skel.min.js", false);
-        saveResource("html/images/bg.jpg", false);
+        saveResource("php/index.php", false);
     }
 
     @Override
@@ -88,10 +74,13 @@ public class WebCore extends JavaPlugin {
         Logger logger = this.getLogger();
         if (this.getConfig().getBoolean("Settings.Autokey")){
             try {
-                AutoJKS.makeRSAkey();
+                logger.info("AutoJKS is currently disabled cause the repo used takes up 5MB in itself..");
+//                AutoJKS.makeRSAkey();
+//                AutoJKS.convertKey("plugins/WebPlugin/ssl/");
                 //AutoJKS.makeJKS();
-            } catch (NoSuchAlgorithmException e) {
-                e.printStackTrace();
+
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
         }
         if (this.getDescription().getVersion().equalsIgnoreCase("devbuild")){
@@ -147,18 +136,6 @@ public class WebCore extends JavaPlugin {
 
             }
         }
-        if (CheckOS.isUnix()) {
-            if (new File("plugins/WebPlugin/phplinux").exists() && new File("plugins/WebPlugin/phplinux/php").exists() && new File("plugins/WebPlugin/phplinux/nginx").exists()) {
-                logger.info("Core Linux PHP files exist!");
-            } else {
-                logger.info("Starting to download files for Nginx and PHP for Linux");
-                try {
-                    LinuxInstaller.LinuxPHPNginxInstaller();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
         if (getConfig().isSet("Settings.HTMLPORT")) {
             try {
                 listeningport = getConfig().getInt("Settings.HTMLPORT");
@@ -187,18 +164,17 @@ public class WebCore extends JavaPlugin {
         }
         if (CheckOS.isUnix()) {
             Startwebserverhtml();
-            LinuxPHPNginxCore.StartLinuxPHP();
+            StartwebserverphpLinux();
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
-                logger.info("For reasons you will NEED to run the server in a docker container so it can install everything.");
-            }else{
-                //Startwebserverphp();
             }
         }
+
     }
     @Override
     public void onDisable() {
         Bukkit.getScheduler().cancelTasks(m);
+        Bukkit.getScheduler().cancelTasks(this);
         this.shutdown = true;
         acceptorRunning = false;
         Socket sockCloser;
@@ -221,9 +197,10 @@ public class WebCore extends JavaPlugin {
             if (CheckOS.isWindows()) {
                 WindowsPHPNginxCore.StopWindowsNginxandPHP();
             }else if (CheckOS.isUnix()) {
-                //LinuxPHPNginxCore
+                LinuxPHPCore.StopLinuxPHP();
             }
         }
+
     }
     private void Startwebserverphp(){
         if (getConfig().getBoolean("Settings.EnablePHP")) {
@@ -234,6 +211,22 @@ public class WebCore extends JavaPlugin {
                 }
             }.runTaskAsynchronously(this);
 
+        }
+    }
+    private void StartwebserverphpLinux(){
+        if (getConfig().getBoolean("Settings.EnablePHP")){
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    try {
+                        LinuxPHPCore.StartLinuxPHP();
+                    } catch (Exception e) {
+                        if (getConfig().getBoolean("Settings.debug")){
+                            throw new RuntimeException(e);
+                        }
+                    }
+                }
+            }.runTaskAsynchronously(this);
         }
     }
     private void Startwebserverhtml(){
@@ -290,15 +283,11 @@ public class WebCore extends JavaPlugin {
                 if (getConfig().getBoolean("Settings.EnablePHP")) {
                     if (CheckOS.isWindows()) {
                         WindowsPHPNginxCore.StopWindowsNginxandPHP();
-                        sender.sendMessage(prefix + " Stopped webserver (PHP)");
+                        sender.sendMessage(prefix + " Stopped Windows webserver (PHP)");
                     }
                     if (CheckOS.isUnix()) {
-                        if (CheckOS.isRunningInsideDocker()){
-                            sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
-                        }else {
-                            sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
-
-                        }
+                        LinuxPHPCore.StopLinuxPHP();
+                        sender.sendMessage(prefix + " Stopped Linux webserver (PHP)");
                     }
                 }else {
                     sender.sendMessage(prefix + " PHP is not enabled!.");
@@ -311,15 +300,11 @@ public class WebCore extends JavaPlugin {
                 if (getConfig().getBoolean("Settings.EnablePHP")) {
                     if (CheckOS.isWindows()) {
                         WindowsPHPNginxCore.StartWindowsNginxandPHP();
-                        sender.sendMessage(prefix + " Started webserver (PHP)");
+                        sender.sendMessage(prefix + " Started Windows webserver (PHP)");
                     }
                     if (CheckOS.isUnix()) {
-                        if (CheckOS.isRunningInsideDocker()){
-                            sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
-                        }else {
-                            sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
-
-                        }
+                        LinuxPHPCore.StartLinuxPHP();
+                        sender.sendMessage(prefix + " Started Linux webserver (PHP)");
                     }
                 }else {
                     sender.sendMessage(prefix + " PHP is not enabled!.");
@@ -332,15 +317,11 @@ public class WebCore extends JavaPlugin {
                 if (getConfig().getBoolean("Settings.EnablePHP")) {
                     if (CheckOS.isWindows()) {
                         WindowsPHPNginxCore.reloadWindowsNginxandPHP();
-                        sender.sendMessage(prefix + " Reloaded webserver (PHP)");
+                        sender.sendMessage(prefix + " Reloaded Windows webserver (PHP)");
                     }
                     if (CheckOS.isUnix()) {
-                        if (CheckOS.isRunningInsideDocker()) {
-                            sender.sendMessage(prefix + " Docker container system for PHP is in the works.");
-                        } else {
-                            sender.sendMessage(prefix + " Plain none dockered linux will not get PHP.");
-
-                        }
+                        LinuxPHPCore.restartLinuxPHP();
+                        sender.sendMessage(prefix + " Reloaded Linux webserver (PHP)");
                     }
                 }else {
                     sender.sendMessage(prefix + " PHP is not enabled!.");
@@ -466,38 +447,6 @@ public class WebCore extends JavaPlugin {
         }
     }
 
-    public static void FilesPermissionsCheckLinux(WebCore core){
-        File phpin1 = new File(core.getDataFolder() + "/phplinux/php/php-8.0.10/./build");
-        File phpin2 = new File(core.getDataFolder() + "/phplinux/php/php-8.0.10/./build/shtool");
-        String phpin3 = "sudo chmod a+x " + core.getDataFolder() + "/phplinux/php/php-8.0.10/";
-        String perms1 = "sudo chmod a+x " + core.getDataFolder() + "/phplinux/php/php-8.0.10/./build/shtool";
-        String perms2 = "sudo chmod a+x " + core.getDataFolder() + "/phplinux/php/php-8.0.10/./build";
-        String FULL = "sudo chown -R root:root " + core.getDataFolder() + "/phplinux/php/php-8.0.10/*";
-        try {
-            core.getLogger().info("Trying to set permissions for Linux");
-            phpin1.setExecutable(true, false);
-            phpin1.setReadable(true, false);
-            phpin1.setWritable(true, false);
-            phpin2.setExecutable(true, false);
-            phpin2.setReadable(true, false);
-            phpin2.setWritable(true, false);
-            Process pro = Runtime.getRuntime().exec(phpin3);
-            Process pro2 = Runtime.getRuntime().exec(perms1);
-            Process pro3 = Runtime.getRuntime().exec(perms2);
-            try {
-                core.getLogger().info("Trying to set full permissions to ROOT");
-                Process FULl = Runtime.getRuntime().exec(FULL);
-            } catch (Exception e) {
-                core.getLogger().info("Failure to give full permissions to ROOT");
-                if (core.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
-            }
-            core.getLogger().info("File permission check success!");
-        } catch (Exception e) {
-            core.getLogger().info("Failed to check permissions! Please enable debug mode and report back to me (dev)");
-            if (core.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
-
-        }
-    }
 
     private static final class CommandValidate {
         private static boolean notPlayer(CommandSender sender) {

@@ -29,7 +29,9 @@ SSLSettings: #jks key required!
 # Read about how to make one and convert it from .pem to .jks here:
 # https://ordina-jworks.github.io/security/2019/08/14/Using-Lets-Encrypt-Certificates-In-Java.html#installing-a-lets-encrypt-certificate
 ###
+Linuxphpsettings:
+  Errorfolder: /errors/
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 8
+ConfigVersion: 10

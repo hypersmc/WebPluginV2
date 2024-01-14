@@ -1,12 +1,13 @@
 name: WebPlugin
 main: me.jumpwatch.webserver.WebCore
-version: 1.9B
+version: 2.0R
 api-version: 1.13
-description: Adds the abaility to have an intergrated webserver for your minecraft server.
-author:
-  - JumpWatch
-  - HypersMC
-  - HumpJump
+description: Adds the ability to have an integrated webserver for your minecraft server.
+author: JumpWatch, HypersMC, HumpJump
+libraries:
+  - org.eclipse.jetty:jetty-server:9.4.51.v20230217
+  - com.caucho:quercus:4.0.45
+  - org.eclipse.jetty:jetty-servlet:9.4.51.v20230217
 commands:
   WebP:
     description: Gets IP or Domain W/ Port

@@ -1,28 +1,80 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Exciting HTML Website</title>
+	<style>
+		body {
+			font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+			background-color: #f9f9f9;
+			margin: 0;
+			padding: 0;
+			color: #333;
+		}
 
-<html>
-	<head>
-		<title>Example website</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<link rel="stylesheet" href="assets/css/main.css" />
-	</head>
-	<body>
+		header {
+			background-color: #1a1a1a;
+			color: #fff;
+			padding: 20px;
+			text-align: center;
+		}
 
-		<!-- Wrapper -->
-			<div id="wrapper">
+		.container {
+			width: 80%;
+			margin: auto;
+			overflow: hidden;
+		}
 
-				<!-- Header -->
-					<header id="header">
-						<h1>This is an <strong>Example</strong> website!<br> Feel free to override it!</h1>
-					</header>
-			</div>
+		article {
+			background-color: #fff;
+			border: 1px solid #ddd;
+			border-radius: 5px;
+			margin: 20px 0;
+			padding: 20px;
+			box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+		}
 
-		<!-- Scripts -->
-			<script src="assets/js/jquery.min.js"></script>
-			<script src="assets/js/jquery.poptrox.min.js"></script>
-			<script src="assets/js/skel.min.js"></script>
-			<script src="assets/js/main.js"></script>
+		h2 {
+			color: #333;
+		}
 
-	</body>
+		p {
+			line-height: 1.6;
+		}
+
+		.date {
+			color: #888;
+		}
+	</style>
+</head>
+<body>
+
+<header>
+	<h1>Exciting HTML Website</h1>
+</header>
+
+<div class="container">
+
+	<article>
+		<h2>Exploring the Wonders of HTML</h2>
+		<p>Discover the amazing features and capabilities of HTML for web development.</p>
+		<p class='date'>Published on 2024-01-14</p>
+	</article>
+
+	<article>
+		<h2>Building Static Websites with HTML and CSS</h2>
+		<p>Learn how to create static and visually appealing websites using HTML and CSS.</p>
+		<p class='date'>Published on 2024-01-15</p>
+	</article>
+
+	<article>
+		<h2>Mastering CSS for Stunning Web Designs</h2>
+		<p>Enhance your web design skills by mastering the art of CSS styling.</p>
+		<p class='date'>Published on 2024-01-16</p>
+	</article>
+
+</div>
+
+</body>
 </html>

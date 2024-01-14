@@ -1,3 +1,13 @@
+/*
+ * ******************************************************
+ *  *Copyright (c) 2020-2022. Jesper Henriksen mhypers@gmail.com
+ *
+ *  * This file is part of WebServer project
+ *  *
+ *  * WebServer can not be copied and/or distributed without the express
+ *  * permission of Jesper Henriksen
+ *  ******************************************************
+ */ 
 package me.jumpwatch.webserver.utils;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
