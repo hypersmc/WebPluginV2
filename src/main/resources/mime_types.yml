@@ -1,0 +1,12 @@
+extensions:
+  - extension: ".htm"
+    type: "text/html"
+  - extension: ".html"
+    type: "text/html"
+  - extension: ".css"
+    type: "text/css"
+  - extension: ".js"
+    type: "application/x-javascript"
+  - extension: ".svg"
+    type: "image/svg+xml"
+  # Add more extensions and types as needed in the same format.

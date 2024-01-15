@@ -15,9 +15,7 @@ import me.jumpwatch.webserver.html.SSLHtml;
 import me.jumpwatch.webserver.php.linux.LinuxPHPCore;
 import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
 import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
-import me.jumpwatch.webserver.utils.CheckOS;
-import me.jumpwatch.webserver.utils.CommandManager;
-import me.jumpwatch.webserver.utils.UpdateChecker;
+import me.jumpwatch.webserver.utils.*;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -45,9 +43,9 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 10;
+    private int version = 11;
     private CommandManager commandManager;
-
+    public ContentTypeResolver resolver;
 
     private synchronized boolean getAcceptorRunning() {
         return acceptorRunning;
@@ -58,10 +56,13 @@ public class WebCore extends JavaPlugin {
     private void sethtmlfiles(){
         saveResource("html/index.html", false);
         saveResource("php/index.php", false);
+        saveResource("mime_types.yml", false);
     }
 
     @Override
     public void onEnable() {
+        resolver = new ContentTypeResolver();
+
         this.shutdown = false;
         this.getLogger().info("Current OS: " + CheckOS.OS);
         this.getLogger().info("Is running Docker: " + CheckOS.isRunningInsideDocker());
@@ -74,10 +75,8 @@ public class WebCore extends JavaPlugin {
         Logger logger = this.getLogger();
         if (this.getConfig().getBoolean("Settings.Autokey")){
             try {
-                logger.info("AutoJKS is currently disabled cause the repo used takes up 5MB in itself..");
-//                AutoJKS.makeRSAkey();
-//                AutoJKS.convertKey("plugins/WebPlugin/ssl/");
-                //AutoJKS.makeJKS();
+                LetsEncryptCertificateMaker.generateLetsEncryptCertificate(getConfig().getString("SSLSettings.SSLDomain"));
+//                logger.info("AutoPEM is currently disabled cause the repo used takes up 5MB in itself..");
 
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -332,6 +331,7 @@ public class WebCore extends JavaPlugin {
         commandManager.register("reload", ((sender, params) -> {
             if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
                 reloadConfig();
+                resolver.reloadContentTypes();
                 sender.sendMessage(prefix + " Configuration file reloaded.");
             }else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");

@@ -15,11 +15,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
 import java.util.*;
 
 public class SSLHtml {
@@ -40,26 +43,18 @@ public class SSLHtml {
     }
 
     public void startSingleThreaded(InetSocketAddress address) {
-        WebCore main = JavaPlugin.getPlugin(WebCore.class);
         System.out.println("Start single-threaded server at " + address);
         BufferedOutputStream dataOut = null;
 
-
-
         try (var serverSocket = getServerSocket(address)) {
 
-            BufferedReader in = null;
-            String fileRequested = null;
+            BufferedReader in;
+            String fileRequested;
 
             while (true) {
                 try (var socket = serverSocket.accept();
-                     var reader = new BufferedReader(new InputStreamReader(
-                             socket.getInputStream()));
-
-                     var writer = new BufferedWriter(new OutputStreamWriter(
-                             socket.getOutputStream()))
-                ) {
-
+                     var reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                     var writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()))) {
 
                     in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
@@ -69,14 +64,14 @@ public class SSLHtml {
                     fileRequested = parse.nextToken().toLowerCase();
                     String s;
                     int counter = 0, contentLength = 0;
+
                     try {
-                        while (!(s = in.readLine()).equals("")){
+                        while (!(s = in.readLine()).equals("")) {
                             if (counter == 0 && s.equalsIgnoreCase(WebCore.closeConnection)) {
 
                                 in.close();
                                 writer.close();
                                 dataOut.close();
-
                                 return;
                             }
                             if (s.startsWith("Content-Length: ")) {
@@ -84,7 +79,7 @@ public class SSLHtml {
                             }
                             counter++;
                         }
-                    }catch (IOException e) {
+                    } catch (IOException e) {
                         main.getServer().getLogger().info("This is not an error and should not be reported.");
                         main.getServer().getLogger().info("Counting failed!");
                     }
@@ -97,7 +92,7 @@ public class SSLHtml {
                     }
                     File file = new File(main.getDataFolder() + "/html/", fileRequested);
                     int fileLength = (int) file.length();
-                    String content = getContentType(fileRequested);
+                    String content = main.resolver.getContentType(fileRequested);
 
                     dataOut = new BufferedOutputStream(socket.getOutputStream());
                     if (method.equals("GET")) {
@@ -117,7 +112,7 @@ public class SSLHtml {
                             main.getServer().getLogger().info("This is not an error and should not be reported.");
                             main.getServer().getLogger().info("Writing failed!");
                         }
-                    }else if (method.equals("POST")) {
+                    } else if (method.equals("POST")) {
                         try {
                             byte[] fileData = readFileData(file, fileLength);
 
@@ -141,32 +136,30 @@ public class SSLHtml {
 
                 } catch (IOException e) {
                     System.err.println("Exception while handling connection");
-                    if (e.getMessage().contains("Received fatal alert: certificate_unknown")){
+                    if (e.getMessage().contains("Received fatal alert: certificate_unknown")) {
                         System.err.println("Received fatal alert: certificate_unknown");
                     }
-                    if (e.getMessage().contains("An established connection was aborted by the software in your host machine")){
-                        System.err.println("An established connection was aborted by the software of client machine");
+                    if (e.getMessage().contains("An established connection was aborted by the software in your host machine")) {
+                        System.err.println("An established connection was aborted by the software of the client machine");
                     }
                     if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
-
                 }
 
             }
         } catch (Exception e) {
-            if (st < fp){
+            if (st < fp) {
                 System.err.println("Could not create socket at " + address);
                 main.getLogger().info("Restarting SSL systems!");
                 this.run();
                 st = st + 1;
                 if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
-            }else {
+            } else {
                 main.getLogger().info("Max restarts exceeded. Please enable debug and view error");
                 return;
             }
-
-
         }
     }
+
     private static byte[] readFileData(File file, int fileLength) throws IOException {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
         FileInputStream fileIn = null;
@@ -175,73 +168,53 @@ public class SSLHtml {
         try {
             fileIn = new FileInputStream(file);
             fileIn.read(fileData);
-        } catch (IOException e){
+        } catch (IOException e) {
             main.getServer().getLogger().info("This is not an error and should not be reported.");
             main.getServer().getLogger().info("File: " + file + " Could not be found!");
-        }finally {
+        } finally {
             if (fileIn != null)
                 fileIn.close();
         }
 
         return fileData;
     }
-    private static String getContentType(String fileRequested) {
-        if (fileRequested.endsWith(".htm")  ||  fileRequested.endsWith(".html")) {
-            return "text/html";
-        }else if (fileRequested.endsWith(".css")) {
-            return "text/css";
-        }else if (fileRequested.endsWith(".js")) {
-            return "application/x-javascript";
-        }else if (fileRequested.endsWith(".svg")){
-            return "image/svg+xml";
-        }else{
-            return "text/plain";
-        }
-    }
-    private static ServerSocket getServerSocket(InetSocketAddress address)
-            throws Exception {
+    private static ServerSocket getServerSocket(InetSocketAddress address) throws Exception {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String ksName = "plugins/WebPlugin/ssl/" + main.getConfig().getString("SSLSettings.SSLJKSName").toString() + ".jks";
-        char ksPass[] = main.getConfig().getString("SSLSettings.SSLJKSPass").toString().toCharArray();
-        char ctPass[] = main.getConfig().getString("SSLSettings.SSLJKSKey").toString().toCharArray();
+        String certFile = main.getDataFolder() + "/ssl/" + main.getConfig().getString("SSLSettings.SSLPubl");
+        String keyFile = main.getDataFolder() + "/ssl/" + main.getConfig().getString("SSLSettings.SSLPriv");
+
+        SSLContext sslContext = getSslContext(certFile, keyFile);
 
         int backlog = 0;
 
-        var serverSocket = getSslContext(Path.of(ksName), ksPass)
-                .getServerSocketFactory()
-                .createServerSocket(address.getPort(), backlog, address.getAddress());
-
-        Arrays.fill(ksPass, '0');
-
-        return serverSocket;
+        return sslContext.getServerSocketFactory().createServerSocket(address.getPort(), backlog, address.getAddress());
     }
 
-    private static SSLContext getSslContext(Path keyStorePath, char[] keyStorePass)
-            throws Exception {
+    private static SSLContext getSslContext(String certFile, String keyFile) throws Exception {
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        keyStore.load(null, null);
 
-        var keyStore = KeyStore.getInstance("JKS");
-        keyStore.load(new FileInputStream(keyStorePath.toFile()), keyStorePass);
-
-        var keyManagerFactory = KeyManagerFactory.getInstance("SunX509");
-        keyManagerFactory.init(keyStore, keyStorePass);
-
-        var sslContext = SSLContext.getInstance("TLSv1.2");
-        // Null means using default implementations for TrustManager and SecureRandom
-        sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
-        return sslContext;
-    }
-
-
-
-    private static List<String> getHeaderLines(BufferedReader reader)
-            throws IOException {
-        var lines = new ArrayList<String>();
-        var line = reader.readLine();
-        // An empty line marks the end of the request's header
-        while (!line.isEmpty()) {
-            lines.add(line);
-            line = reader.readLine();
+        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+        try (FileInputStream certInputStream = new FileInputStream(certFile)) {
+            Collection<? extends Certificate> certificates = certificateFactory.generateCertificates(certInputStream);
+            int i = 0;
+            for (Certificate certificate : certificates) {
+                keyStore.setCertificateEntry("cert" + i, certificate);
+                i++;
+            }
         }
-        return lines;
+
+        KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        try (FileInputStream keyInputStream = new FileInputStream(keyFile)) {
+            keyManagerFactory.init(keyStore, keyInputStream == null ? null : keyInputStream.toString().toCharArray());
+        }
+
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init((KeyStore) null);
+
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
+
+        return sslContext;
     }
 }

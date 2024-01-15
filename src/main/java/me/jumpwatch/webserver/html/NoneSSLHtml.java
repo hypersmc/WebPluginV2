@@ -27,13 +27,19 @@ public class NoneSSLHtml extends Thread{
 
     @Override
     public void run() {
-
-        BufferedReader in = null; PrintWriter out = null; BufferedOutputStream dataOut = null;
-        String fileRequested = null;
+        try (
+                BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+                PrintWriter out = new PrintWriter(sock.getOutputStream());
+                BufferedOutputStream dataOut = new BufferedOutputStream(sock.getOutputStream())
+        ) {
+            processRequest(in, out, dataOut);
+        } catch (Exception e) {
+            if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
+        }
+    }
+    private void processRequest(BufferedReader in, PrintWriter out, BufferedOutputStream dataOut) {
+        String fileRequested;
         try {
-            in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-            out = new PrintWriter(sock.getOutputStream());
-            dataOut = new BufferedOutputStream(sock.getOutputStream());
             String input = in.readLine();
             StringTokenizer parse = new StringTokenizer(input);
             String method = parse.nextToken().toUpperCase();
@@ -43,10 +49,7 @@ public class NoneSSLHtml extends Thread{
             try {
                 while (!(s = in.readLine()).equals("")) {
                     if (counter == 0 && s.equalsIgnoreCase(WebCore.closeConnection)) {
-                        out.close();
-                        in.close();
-                        sock.close();
-
+                        closeSocket();
                         return;
                     }
                     if (s.startsWith("Content-Length: ")) {
@@ -54,105 +57,56 @@ public class NoneSSLHtml extends Thread{
                     }
                     counter++;
                 }
-            }catch (IOException e) {
+            } catch (IOException e) {
                 main.getServer().getLogger().info("This is not an error and should not be reported.");
                 main.getServer().getLogger().info("Counting failed!");
             }
+
             String finalString = "";
-            for(int i = 0; i < contentLength; i++){
+            for (int i = 0; i < contentLength; i++) {
                 finalString += (char) in.read();
             }
+
             if (fileRequested.endsWith("/")) {
                 fileRequested += DEFAULT_FILE;
             }
             File file = new File(main.getDataFolder() + "/html/", fileRequested);
             int fileLength = (int) file.length();
-            String content = getContentType(fileRequested);
-            if (method.equals("GET")) { // GET method so we return content
-                try {
+            String content = main.resolver.getContentType(fileRequested);
 
-                    byte[] fileData = readFileData(file, fileLength);
+            // send HTTP Headers
+            out.write("HTTP/1.1 200 OK\r\n");
+            out.write("Server: Java HTTP Server from WebPlugin : " + main.getDescription().getVersion() + "\r\n");
+            out.println("Set-Cookie: Max-Age=0; Secure; HttpOnly");
+            out.println("Date: " + new Date());
+            out.println("Content-type: " + content + "\r\n");
+            out.flush(); // flush character output stream buffer
 
-                    // send HTTP Headers
-                    out.write("HTTP/1.1 200 OK");
-                    out.write("Server: Java HTTP Server from SSaurel : 1.0");
-                    out.println("Set-Cookie: Max-Age=0; Secure; HttpOnly");
-                    out.println("Date: " + new Date());
-                    out.println("Content-type: " + content);
+            byte[] fileData = readFileData(file, fileLength);
 
-                    out.println(); // blank line between headers and content, very important !
-                    out.flush(); // flush character output stream buffer
+            dataOut.write(fileData, 0, fileLength);
+            dataOut.flush();
 
-                    dataOut.write(fileData, 0, fileLength);
-                    dataOut.flush();
-                }catch (IOException e) {
-                    main.getServer().getLogger().info("This is not an error and should not be reported.");
-                    main.getServer().getLogger().info("Writing failed!");
-                }
-            }else if (method.equals("POST")) { // POST method so we return stuff.
-                try {
-
-                    byte[] fileData = readFileData(file, fileLength);
-
-                    // send HTTP Headers
-                    out.write("HTTP/1.1 200 OK");
-                    out.write("Server: Java HTTP Server from SSaurel : 1.0");
-                    out.println("Set-Cookie: Max-Age=0; Secure; HttpOnly");
-                    out.println("Date: " + new Date());
-                    out.println("Content-type: " + content);
-
-                    out.println(); // blank line between headers and content, very important !
-                    out.flush(); // flush character output stream buffer
-
-                    dataOut.write(fileData, 0, fileLength);
-                    dataOut.flush();
-                }catch (IOException e) {
-                    main.getServer().getLogger().info("This is not an error and should not be reported.");
-                    main.getServer().getLogger().info("Writing failed!");
-                }
-            }
-            out.close();
-            in.close();
-            sock.close();
-        }catch (Exception e) {
-            if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
+        } catch (IOException e) {
+            main.getServer().getLogger().info("Error processing request: " + e.getMessage());
+        } finally {
+            closeSocket();
         }
     }
-
-    private byte[] readFileData(File file, int fileLength) throws IOException {
-        FileInputStream fileIn = null;
-
-        byte[] fileData = new byte[fileLength];
-
+    private void closeSocket() {
         try {
-            fileIn = new FileInputStream(file);
-            fileIn.read(fileData);
-        } catch (IOException e){
-            main.getServer().getLogger().info("This is not an error and should not be reported.");
-            main.getServer().getLogger().info("File: " + file + " Could not be found!");
-        }finally {
-            if (fileIn != null)
-                fileIn.close();
+            sock.close();
+        } catch (IOException e) {
+            main.getServer().getLogger().info("Error closing socket: " + e.getMessage());
         }
-
-        return fileData;
     }
-
-    /*
-    Returns supported MIME types
-    Add a issue on github if more is needed!
-     */
-    private String getContentType(String fileRequested) {
-        if (fileRequested.endsWith(".htm")  ||  fileRequested.endsWith(".html")) {
-            return "text/html";
-        }else if (fileRequested.endsWith(".css")) {
-            return "text/css";
-        }else if (fileRequested.endsWith(".js")) {
-            return "application/x-javascript";
-        }else if (fileRequested.endsWith(".svg")){
-            return "image/svg+xml";
-        }else{
-            return "text/plain";
+    private byte[] readFileData(File file, int fileLength) throws IOException {
+        byte[] fileData = new byte[fileLength];
+        try (FileInputStream fileIn = new FileInputStream(file)) {
+            fileIn.read(fileData);
+        } catch (IOException e) {
+            main.getServer().getLogger().info("Error reading file data: " + e.getMessage());
         }
+        return fileData;
     }
 }

@@ -8,6 +8,10 @@ libraries:
   - org.eclipse.jetty:jetty-server:9.4.51.v20230217
   - com.caucho:quercus:4.0.45
   - org.eclipse.jetty:jetty-servlet:9.4.51.v20230217
+  - org.shredzone.acme4j:acme4j-client:3.1.1
+  - org.shredzone.acme4j:acme4j-it:3.1.1
+  - org.shredzone.acme4j:acme4j-smime:3.1.1
+  - org.shredzone.acme4j:acme4j-utils:2.9
 commands:
   WebP:
     description: Gets IP or Domain W/ Port

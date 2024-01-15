@@ -18,20 +18,15 @@ Settings:
   EnableHTML: true
   Autokey: false #Don't enable as it's still WIP.
 
-SSLSettings: #jks key required!
+SSLSettings: #PEM Key required!
   EnableSSL: false
   SSLPort: 25570
-  SSLJKSName: filename #Without .jks
-  SSLJKSPass: filepass
-  SSLJKSKey: filekey
-###
-# While the self-signed key is nice and all I do recommend a lets-encrypt cert.
-# Read about how to make one and convert it from .pem to .jks here:
-# https://ordina-jworks.github.io/security/2019/08/14/Using-Lets-Encrypt-Certificates-In-Java.html#installing-a-lets-encrypt-certificate
-###
+  SSLDomain: domain.com
+  SSLPriv: private-key.pem
+  SSLPubl: public-key.pem
 Linuxphpsettings:
   Errorfolder: /errors/
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 10
+ConfigVersion: 11
