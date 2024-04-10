@@ -22,7 +22,7 @@ import java.net.URL;
 public class WindowsPHPGetter {
     public static void WindowsNginxGetter(){
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String url = "http://nginx.org/download/nginx-1.20.1.zip";
+        String url = "http://nginx.org/download/nginx-1.25.4.zip";
         try {
             File dir = new File(main.getDataFolder() + "/tmpfiles/");
             dir.mkdirs();
@@ -36,7 +36,7 @@ public class WindowsPHPGetter {
 
     public static void WindowsPHPGetter(){
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String url = "https://windows.php.net/downloads/releases/php-8.1.4-Win32-vs16-x86.zip";
+        String url = "https://windows.php.net/downloads/releases/php-8.1.28-Win32-vs16-x86.zip";
         try {
             File dir = new File(main.getDataFolder() + "/tmpfiles/");
             dir.mkdirs();

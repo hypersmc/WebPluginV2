@@ -74,6 +74,11 @@
             'description' => 'Enhance your web design skills by mastering the art of CSS styling.',
             'date' => '2024-01-16',
         ),
+        array(
+                'title' => 'Using Java Classes in PHP',
+                'description' => 'Explore the integration of Java classes into PHP applications for enhanced functionality by using "import path.to.java.class" without quotes ',
+                'date' => '2024-04-08',
+            ),
     );
 
     // Display articles

@@ -23,7 +23,7 @@ public class WindowsPHPNginxCore {
 
     public static void StopWindowsNginxandPHP(){
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/nginx.exe -s quit -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/";
+        String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/nginx.exe -s quit -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/";
         String PHP = "CMD /C taskkill /f /IM php.exe /T";
         String line;
         try {
@@ -49,7 +49,7 @@ public class WindowsPHPNginxCore {
     }
     public static void reloadWindowsNginxandPHP(){
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/nginx.exe -s reload -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/";
+        String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/nginx.exe -s reload -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/";
         String PHPStop = "CMD /C taskkill /f /IM php.exe /T";
         String PHPStart = main.getDataFolder() + "/phpwindows/php/php.exe -S " + main.getConfig().getString("Settings.ServerIP") + ":"+ main.getConfig().getString("Settings.PHPPort") + " -t " + main.getDataFolder() + "/phpwindows/php/public";
         String line;
@@ -82,14 +82,14 @@ public class WindowsPHPNginxCore {
         main.getLogger().info("Ensuring right permissions!");
         FilesPermissionsCheckWindows(main);
         main.getLogger().info("Ensuring that IP and Port is set!");
-        ConfigChanger.Changeconf(main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/conf/nginx.conf", "localhost", main.getConfig().getString("Settings.ServerIP") + "");
-        ConfigChanger.Changeconf(main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/conf/nginx.conf", "80", main.getConfig().getString("Settings.PHPPort") + "");
+        ConfigChanger.Changeconf(main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/conf/nginx.conf", "localhost", main.getConfig().getString("Settings.ServerIP") + "");
+        ConfigChanger.Changeconf(main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/conf/nginx.conf", "80", main.getConfig().getString("Settings.PHPPort") + "");
         main.getLogger().info("Success!");
         try {
             main.getLogger().info(main.getConfig().getString("Settings.ServerIP") + ":" + main.getConfig().getString("Settings.PHPPort"));
             File folder = new File(main.getDataFolder() + "/phpwindows/php/public/");
             folder.mkdirs();
-            String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/nginx.exe -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/";
+            String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/nginx.exe -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/";
             String PHP = main.getDataFolder() + "/phpwindows/php/php.exe -S " + main.getConfig().getString("Settings.ServerIP") + ":"+ main.getConfig().getString("Settings.PHPPort") + " -t " + main.getDataFolder() + "/phpwindows/php/public";
             Process PNginx = Runtime.getRuntime().exec(Nginx);
             main.getLogger().info("Attempting to start PHP");
@@ -129,8 +129,8 @@ public class WindowsPHPNginxCore {
     }
 
     private static void FilesPermissionsCheckWindows(WebCore core){
-        File Nginx = new File(core.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/nginx.exe");
-        File NginxFolder = new File(core.getDataFolder() + "/phpwindows/nginx/nginx-1.20.1/");
+        File Nginx = new File(core.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/nginx.exe");
+        File NginxFolder = new File(core.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/");
         File PHPCoreFolder = new File(core.getDataFolder() + "/phpwindows/");
         try {
             Nginx.setExecutable(true, false);

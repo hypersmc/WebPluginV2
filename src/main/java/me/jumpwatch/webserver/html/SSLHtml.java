@@ -7,7 +7,7 @@
  *  * WebServer can not be copied and/or distributed without the express
  *  * permission of Jesper Henriksen
  *  ******************************************************
- */ 
+ */
 package me.jumpwatch.webserver.html;
 
 import me.jumpwatch.webserver.WebCore;
@@ -15,12 +15,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.security.KeyStore;
+import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.util.*;
@@ -34,7 +36,7 @@ public class SSLHtml {
 
     public void run(){
         try {
-            var address = new InetSocketAddress("localhost", main.getConfig().getInt("SSLSettings.SSLPort"));
+            var address = new InetSocketAddress("0.0.0.0", main.getConfig().getInt("SSLSettings.SSLPort"));
             startSingleThreaded(address);
         } catch (Exception e) {
             if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
@@ -48,8 +50,8 @@ public class SSLHtml {
 
         try (var serverSocket = getServerSocket(address)) {
 
-            BufferedReader in;
-            String fileRequested;
+            BufferedReader in = null;
+            String fileRequested = null;
 
             while (true) {
                 try (var socket = serverSocket.accept();
@@ -58,7 +60,17 @@ public class SSLHtml {
 
                     in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
-                    String input = in.readLine();
+                    char[] buffer = new char[1024];
+                    int bytesRead = in.read(buffer, 0, buffer.length);
+
+                    if (bytesRead == -1) {
+                        System.out.println("No data received. Client may have closed the connection.");
+                        // Handle the situation accordingly, e.g., break out of the loop.
+                        break;
+                    }
+
+                    // Convert chars to String
+                    String input = new String(buffer, 0, bytesRead);
                     StringTokenizer parse = new StringTokenizer(input);
                     String method = parse.nextToken().toUpperCase();
                     fileRequested = parse.nextToken().toLowerCase();
@@ -100,7 +112,7 @@ public class SSLHtml {
                             byte[] fileData = readFileData(file, fileLength);
 
                             writer.write("HTTP/1.1 200 OK\r\n");
-                            writer.write("Server: Java HTTP Server from SSaurel : 1.0\r\n");
+                            writer.write("Server: Java HTTPS Server from WebPlugin : " + main.getDescription().getVersion() + "\r\n");
                             writer.write("Set-Cookie: Max-Age=0; Secure;\r\n");
                             writer.write("Date: " + new Date() + "\r\n");
                             writer.write("Content-type: " + content + "\r\n");
@@ -117,7 +129,7 @@ public class SSLHtml {
                             byte[] fileData = readFileData(file, fileLength);
 
                             writer.write("HTTP/1.1 200 OK\r\n");
-                            writer.write("Server: Java HTTP Server from SSaurel : 1.0\r\n");
+                            writer.write("Server: Java HTTPS Server from WebPlugin : " + main.getDescription().getVersion() + "\r\n");
                             writer.write("Set-Cookie: Max-Age=0; Secure;\r\n");
                             writer.write("Date: " + new Date() + "\r\n");
                             writer.write("Content-type: " + content + "\r\n");
@@ -150,11 +162,12 @@ public class SSLHtml {
             if (st < fp) {
                 System.err.println("Could not create socket at " + address);
                 main.getLogger().info("Restarting SSL systems!");
-                this.run();
                 st = st + 1;
+                this.run();
                 if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
             } else {
                 main.getLogger().info("Max restarts exceeded. Please enable debug and view error");
+                if (main.getConfig().getBoolean("Settings.debug")) e.printStackTrace();
                 return;
             }
         }
@@ -212,8 +225,12 @@ public class SSLHtml {
         TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trustManagerFactory.init((KeyStore) null);
 
-        SSLContext sslContext = SSLContext.getInstance("TLS");
-        sslContext.init(keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
+        SSLContext sslContext = SSLContext.getInstance("TLSv1.3");
+        sslContext.init(
+                keyManagerFactory.getKeyManagers(),
+                trustManagerFactory.getTrustManagers(),
+                new SecureRandom()
+        );
 
         return sslContext;
     }

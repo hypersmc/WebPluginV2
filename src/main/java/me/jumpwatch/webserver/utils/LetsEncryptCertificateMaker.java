@@ -101,7 +101,7 @@ public class LetsEncryptCertificateMaker {
     private static void saveToPemFile(String filename, Object object) {
         try (FileOutputStream fos = new FileOutputStream(filename);
              PEMWriter pemWriter = new PEMWriter(new OutputStreamWriter(fos))) {
-            pemWriter.writeObject(object);
+             pemWriter.writeObject(object);
         } catch (IOException e) {
             e.printStackTrace();
         }

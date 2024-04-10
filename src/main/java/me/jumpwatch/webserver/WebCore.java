@@ -43,7 +43,7 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 11;
+    private int version = 10;
     private CommandManager commandManager;
     public ContentTypeResolver resolver;
 
@@ -56,13 +56,14 @@ public class WebCore extends JavaPlugin {
     private void sethtmlfiles(){
         saveResource("html/index.html", false);
         saveResource("php/index.php", false);
-        saveResource("mime_types.yml", false);
     }
 
     @Override
     public void onEnable() {
-        resolver = new ContentTypeResolver();
 
+        resolver = new ContentTypeResolver();
+        resolver.reloadContentTypes();
+        if (!new File(getDataFolder(), "mime_types.yml").exists()) saveResource("mime_types.yml", false);
         this.shutdown = false;
         this.getLogger().info("Current OS: " + CheckOS.OS);
         this.getLogger().info("Is running Docker: " + CheckOS.isRunningInsideDocker());
@@ -75,8 +76,8 @@ public class WebCore extends JavaPlugin {
         Logger logger = this.getLogger();
         if (this.getConfig().getBoolean("Settings.Autokey")){
             try {
-                LetsEncryptCertificateMaker.generateLetsEncryptCertificate(getConfig().getString("SSLSettings.SSLDomain"));
-//                logger.info("AutoPEM is currently disabled cause the repo used takes up 5MB in itself..");
+//                LetsEncryptCertificateMaker.generateLetsEncryptCertificate(getConfig().getString("SSLSettings.SSLDomain"));
+                logger.info("AutoPEM  is currently disabled there was issues with it!");
 
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -264,14 +265,14 @@ public class WebCore extends JavaPlugin {
         commandManager.register("help", ((sender, params) -> {
             if (sender.hasPermission("web.help") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " Commands: ");
-                sender.sendMessage(prefix + " /webp reload reloads the plugin's configuration (NOT RESET)");
-                sender.sendMessage(prefix + " /webp dev gets who developed this plugin and plugin version");
-                sender.sendMessage(prefix + " /webp ver gets plugin version and checks if there is a new version");
-                sender.sendMessage(prefix + " /webp help to get this again.");
-                sender.sendMessage(prefix + " /webp stopweb (ONLY works if php is enabled!");
-                sender.sendMessage(prefix + " /webp startweb (ONLY works if php is enabled!");
-                sender.sendMessage(prefix + " /webp webreload (ONLY works if php is enabled!");
-                sender.sendMessage(prefix + " /webp reset (ONLY works in console!)");
+                sender.sendMessage(prefix + " /webp reload | reloads the plugin's configuration (NOT RESET)");
+                sender.sendMessage(prefix + " /webp dev | gets who developed this plugin and plugin version");
+                sender.sendMessage(prefix + " /webp ver | gets plugin version and checks if there is a new version");
+                sender.sendMessage(prefix + " /webp help | to get this again.");
+                sender.sendMessage(prefix + " /webp stopweb | (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp startweb | (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp webreload | (ONLY works if php is enabled!");
+                sender.sendMessage(prefix + " /webp reset | (ONLY works in console!)");
             } else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
             }

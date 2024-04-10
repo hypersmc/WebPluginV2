@@ -11,6 +11,7 @@
 package me.jumpwatch.webserver.html;
 
 import me.jumpwatch.webserver.WebCore;
+import me.jumpwatch.webserver.utils.ContentTypeResolver;
 
 import java.io.*;
 import java.net.Socket;
@@ -72,12 +73,13 @@ public class NoneSSLHtml extends Thread{
             }
             File file = new File(main.getDataFolder() + "/html/", fileRequested);
             int fileLength = (int) file.length();
-            String content = main.resolver.getContentType(fileRequested);
+            ContentTypeResolver resolver = new ContentTypeResolver();
+            String content = resolver.getContentType(fileRequested);
 
             // send HTTP Headers
             out.write("HTTP/1.1 200 OK\r\n");
             out.write("Server: Java HTTP Server from WebPlugin : " + main.getDescription().getVersion() + "\r\n");
-            out.println("Set-Cookie: Max-Age=0; Secure; HttpOnly");
+            out.println("Set-Cookie: Max-Age=0; HttpOnly");
             out.println("Date: " + new Date());
             out.println("Content-type: " + content + "\r\n");
             out.flush(); // flush character output stream buffer
