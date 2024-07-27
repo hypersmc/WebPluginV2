@@ -11,6 +11,7 @@
 package me.jumpwatch.webserver.html;
 
 import me.jumpwatch.webserver.WebCore;
+import me.jumpwatch.webserver.utils.ContentTypeResolver;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -104,7 +105,8 @@ public class SSLHtml {
                     }
                     File file = new File(main.getDataFolder() + "/html/", fileRequested);
                     int fileLength = (int) file.length();
-                    String content = main.resolver.getContentType(fileRequested);
+                    ContentTypeResolver resolver = new ContentTypeResolver();
+                    String content = resolver.getContentType(fileRequested);
 
                     dataOut = new BufferedOutputStream(socket.getOutputStream());
                     if (method.equals("GET")) {

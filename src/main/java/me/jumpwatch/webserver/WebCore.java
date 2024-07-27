@@ -55,14 +55,12 @@ public class WebCore extends JavaPlugin {
     }
     private void sethtmlfiles(){
         saveResource("html/index.html", false);
-        saveResource("php/index.php", false);
     }
 
     @Override
     public void onEnable() {
-
         resolver = new ContentTypeResolver();
-        resolver.reloadContentTypes();
+        resolver.loadContentTypesBukkit();
         if (!new File(getDataFolder(), "mime_types.yml").exists()) saveResource("mime_types.yml", false);
         this.shutdown = false;
         this.getLogger().info("Current OS: " + CheckOS.OS);
@@ -113,7 +111,6 @@ public class WebCore extends JavaPlugin {
                 saveResource("ssl/removeme.txt", false);
                 File removeme = new File("ssl/removeme.txt");
                 removeme.delete();
-
             }
         }
 
@@ -332,7 +329,7 @@ public class WebCore extends JavaPlugin {
         commandManager.register("reload", ((sender, params) -> {
             if (sender.hasPermission("web.reload") || sender.hasPermission("web.*")) {
                 reloadConfig();
-                resolver.reloadContentTypes();
+                resolver.loadContentTypesBukkit();
                 sender.sendMessage(prefix + " Configuration file reloaded.");
             }else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");

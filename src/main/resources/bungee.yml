@@ -1,0 +1,5 @@
+name: WebPlugin
+main: me.jumpwatch.webserver.proxy.WebCoreProxy
+version: 2.4R
+description: Adds the ability to have an integrated webserver for your minecraft server.
+author: JumpWatch, HypersMC, HumpJump

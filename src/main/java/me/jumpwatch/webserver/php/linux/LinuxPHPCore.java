@@ -18,10 +18,12 @@ import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
+import java.io.File;
+
 public class LinuxPHPCore {
+
     private static Server server;
     public static void StartLinuxPHP() {
-
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
         if (main.getConfig().getBoolean("Settings.EnablePHP")) {
             server = new Server(Integer.parseInt(main.getConfig().getString("Settings.PHPPort")));
@@ -47,6 +49,7 @@ public class LinuxPHPCore {
                 }
             }
         }
+
     }
     public static void StopLinuxPHP() {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
