@@ -1,8 +1,8 @@
 package me.jumpwatch.webserver.utils;
 
 import me.jumpwatch.webserver.WebCore;
-import me.jumpwatch.webserver.proxy.WebCoreProxy;
-import me.jumpwatch.webserver.proxy.WebCoreProxyVel;
+import me.jumpwatch.webserver.WebCoreProxy;
+import me.jumpwatch.webserver.WebCoreProxyVel;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.yaml.snakeyaml.Yaml;
 

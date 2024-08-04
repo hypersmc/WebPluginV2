@@ -1,7 +1,9 @@
-package me.jumpwatch.webserver.proxy;
+package me.jumpwatch.webserver;
 
 
 import me.jumpwatch.webserver.html.NoneSSLHtmlProxyBun;
+import me.jumpwatch.webserver.php.linux.PHPWebServerBun;
+import me.jumpwatch.webserver.php.linux.PhpInstaller;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.ContentTypeResolver;
 import net.md_5.bungee.api.ProxyServer;
@@ -9,8 +11,8 @@ import net.md_5.bungee.api.plugin.Plugin;
 import net.md_5.bungee.config.Configuration;
 import net.md_5.bungee.config.ConfigurationProvider;
 import net.md_5.bungee.config.YamlConfiguration;
+import org.bstats.bungeecord.Metrics;
 
-import javax.inject.Inject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -20,6 +22,7 @@ import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -30,7 +33,7 @@ import java.util.logging.Logger;
  */
 public class WebCoreProxy extends Plugin {
     public Configuration configuration;
-    public String pluginversion = "2.4R";
+    public String pluginversion = "2.5R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private WebCoreProxy m = this;
@@ -38,15 +41,19 @@ public class WebCoreProxy extends Plugin {
     private Thread acceptor;
     private boolean acceptorRunning;
     private ServerSocket ss;
+    private ServerSocket ssPHP;
     public static String ver;
-    private int version = 10;
+    private int version = 11;
     public ContentTypeResolver resolver;
     private Logger logger = Logger.getLogger("WebPluginProxyBun");
     public static File dataFolder;
     @Override //All other (Bungeecord and such)
     public void onEnable() {
+        int pluginid = 22870;
+        Metrics metrics = new Metrics(this, pluginid);
         dataFolder = getDataFolder();
         getLogger().info("WebPluginProxy enabled");
+        checkAndUpdateConfig();
         try{
             makeConfig();
             configuration  = ConfigurationProvider.getProvider(YamlConfiguration.class).load(new File(getDataFolder(), "config.yml"));
@@ -102,6 +109,24 @@ public class WebCoreProxy extends Plugin {
                 }
             }
         }
+        if (configuration.getString("Settings.PHPPort") != null){
+            try {
+                listeningport = (int) configuration.getInt("Settings.PHPPort");
+                ssPHP = new ServerSocket(listeningport);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }else{
+            if (configuration.getString("Settings.PHPPort") == null){
+                logger.severe("Port not found! Using internal default port!");
+                try {
+                    listeningport = 25568;
+                    ssPHP = new ServerSocket(listeningport);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
         if (CheckOS.isWindows()){
             Startwebserverhtml();
             //Startwebserverphp();
@@ -109,8 +134,7 @@ public class WebCoreProxy extends Plugin {
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
-            //StartwebserverphpLinux();
-            //I'm currently unable to make PHP work because I can't access libraries the same way as on SpigotMC.
+            StartwebserverphpLinux();
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getDescription().getName() + " in a linux machine but not in a docker container!");
             }
@@ -176,7 +200,7 @@ public class WebCoreProxy extends Plugin {
     private void Startwebserverhtml(){
         acceptorRunning = true;
         boolean enableHTML = (Boolean) configuration.getBoolean("Settings.EnableHTML");
-        boolean enableSSL = (Boolean) configuration.getBoolean("Settings.EnableSSL");
+        boolean enableSSL = (Boolean) configuration.getBoolean("SSLSettings.EnableSSL");
         if (enableHTML){
             if (enableSSL){
                 ProxyServer.getInstance().getScheduler().schedule(this, () -> {
@@ -199,6 +223,93 @@ public class WebCoreProxy extends Plugin {
                     }
                 }, 1l, TimeUnit.MILLISECONDS);
             }
+        }
+    }
+    private void StartwebserverphpLinux() {
+        boolean enablePHP = (Boolean) configuration.getBoolean("Settings.EnablePHP");
+        if (enablePHP) {
+            if (!new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+                PhpInstaller.installphp();
+                PhpInstaller.FilePermissions(); //Extra check as you never know :)
+                if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+                    startwebserverphp();
+                }
+            } else {
+                startwebserverphp();
+            }
+        }
+    }
+    private void startwebserverphp() {
+        acceptorRunning = true;
+        ProxyServer.getInstance().getScheduler().schedule(this, () -> {
+            while (acceptorRunning) {
+                try {
+                    Socket sock = ssPHP.accept();
+                    new PHPWebServerBun(sock, m).start();
+                } catch (IOException e) {
+                    logger.severe("Error accepting socket connection");
+                }
+            }
+        }, 1l, TimeUnit.MILLISECONDS);
+    }
+    private void checkAndUpdateConfig() {
+        File configFile = new File(dataFolder.toPath().toFile(), "config.yml");
+        File backupFile = new File(dataFolder.toPath().toFile(), "config_backup.yml");
+        logger.info("Checking config version!");
+        if (!configFile.exists()) {
+            logger.warning("No config version found. Either config corrupt or never existed.");
+            // If config doesn't exist, copy the default config
+            copyDefaultConfig(configFile);
+        } else {
+            // Config exists, check version
+            int configVersion = getConfigVersion(configFile);
+            if (configVersion == -99 || configVersion != version) {
+                logger.warning("Config is not right. Config is missing an update or you changed it!");
+                logger.info("An backup will be made!");
+                logger.info("Making backup!");
+                // Backup old config and replace with default
+                backupOldConfig(configFile, backupFile);
+                logger.info("Done!");
+                logger.info("Config was not up to date!");
+                logger.info("Recreating!");
+                copyDefaultConfig(configFile);
+            }else{
+                logger.info("Config is up to date!");
+            }
+        }
+    }
+    private int getConfigVersion(File configFile) {
+        try {
+            Properties properties = new Properties();
+            properties.load(Files.newInputStream(configFile.toPath()));
+            return Integer.parseInt(properties.getProperty("ConfigVersion"));
+        } catch (IOException e) {
+            logger.severe("Error reading config version");
+            return -99;
+        }
+    }
+
+    private void backupOldConfig(File configFile, File backupFile) {
+        try {
+            if (configFile.exists()) {
+                Files.copy(configFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                logger.info("Backed up old config to " + backupFile.getPath());
+            }
+        } catch (IOException e) {
+            logger.severe("Error backing up old config");
+        }
+    }
+
+    private void copyDefaultConfig(File configFile) {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+            if (inputStream == null) {
+                logger.severe("Default config file not found in JAR.");
+                return;
+            }
+            Files.copy(inputStream, configFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            logger.info("Copied default config to " + configFile.getPath());
+        } catch (IOException e) {
+            logger.severe("Error copying default config");
         }
     }
 }

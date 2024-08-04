@@ -12,10 +12,12 @@ package me.jumpwatch.webserver;
 
 import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
-import me.jumpwatch.webserver.php.linux.LinuxPHPCore;
+import me.jumpwatch.webserver.php.linux.PHPWebServer;
+import me.jumpwatch.webserver.php.linux.PhpInstaller;
 import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
 import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
 import me.jumpwatch.webserver.utils.*;
+import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
@@ -42,8 +44,9 @@ public class WebCore extends JavaPlugin {
     private Thread acceptor;
     private boolean acceptorRunning;
     private ServerSocket ss;
+    private ServerSocket ssPHP;
     public static String ver;
-    private int version = 10;
+    private int version = 11;
     private CommandManager commandManager;
     public ContentTypeResolver resolver;
 
@@ -59,6 +62,8 @@ public class WebCore extends JavaPlugin {
 
     @Override
     public void onEnable() {
+        int pluginid = 22869;
+        Metrics metrics = new Metrics(this, pluginid);
         resolver = new ContentTypeResolver();
         resolver.loadContentTypesBukkit();
         if (!new File(getDataFolder(), "mime_types.yml").exists()) saveResource("mime_types.yml", false);
@@ -144,8 +149,30 @@ public class WebCore extends JavaPlugin {
             if (getConfig().contains("Settings.HTMLPORT")) {
                 getLogger().warning("Port not found! Using internal default port!");
                 try {
-                    listeningport = getConfig().getInt("Settings.HTMLPORT");
+                    listeningport = 25567;
                     ss = new ServerSocket(listeningport);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }else {
+                getLogger().warning("Plugin disabled! NO VALUE WAS FOUND FOR LISTENING PORT!");
+                Bukkit.getPluginManager().disablePlugin(this);
+                return;
+            }
+        }
+        if (getConfig().isSet("Settings.PHPPort")) {
+            try {
+                listeningport = getConfig().getInt("Settings.PHPPort");
+                ssPHP = new ServerSocket(listeningport);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }else {
+            if (getConfig().contains("Settings.PHPPort")) {
+                getLogger().warning("Port not found! Using internal default port!");
+                try {
+                    listeningport = 25568;
+                    ssPHP = new ServerSocket(listeningport);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -194,7 +221,7 @@ public class WebCore extends JavaPlugin {
             if (CheckOS.isWindows()) {
                 WindowsPHPNginxCore.StopWindowsNginxandPHP();
             }else if (CheckOS.isUnix()) {
-                LinuxPHPCore.StopLinuxPHP();
+
             }
         }
 
@@ -212,19 +239,32 @@ public class WebCore extends JavaPlugin {
     }
     private void StartwebserverphpLinux(){
         if (getConfig().getBoolean("Settings.EnablePHP")){
-            new BukkitRunnable() {
-                @Override
-                public void run() {
+            if (!new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+                PhpInstaller.installphp();
+                PhpInstaller.FilePermissions(); //Extra check as you never know :)
+                if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+                    startwebserverphp();
+                }
+            } else {
+                startwebserverphp();
+            }
+        }
+    }
+    private void startwebserverphp() {
+        acceptorRunning = true;
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                while (acceptorRunning) {
                     try {
-                        LinuxPHPCore.StartLinuxPHP();
-                    } catch (Exception e) {
-                        if (getConfig().getBoolean("Settings.debug")){
-                            throw new RuntimeException(e);
-                        }
+                        Socket sock = ssPHP.accept();
+                        new PHPWebServer(sock, m).start();
+                    } catch (IOException e) {
+                        getLogger().severe("Error accepting socket connection");
                     }
                 }
-            }.runTaskAsynchronously(this);
-        }
+            }
+        }.runTaskAsynchronously(this);
     }
     private void Startwebserverhtml(){
         acceptorRunning = true;
@@ -283,8 +323,7 @@ public class WebCore extends JavaPlugin {
                         sender.sendMessage(prefix + " Stopped Windows webserver (PHP)");
                     }
                     if (CheckOS.isUnix()) {
-                        LinuxPHPCore.StopLinuxPHP();
-                        sender.sendMessage(prefix + " Stopped Linux webserver (PHP)");
+                        sender.sendMessage(prefix + " Stopping PHP webserver on linux is no longer possible.");
                     }
                 }else {
                     sender.sendMessage(prefix + " PHP is not enabled!.");
@@ -300,8 +339,7 @@ public class WebCore extends JavaPlugin {
                         sender.sendMessage(prefix + " Started Windows webserver (PHP)");
                     }
                     if (CheckOS.isUnix()) {
-                        LinuxPHPCore.StartLinuxPHP();
-                        sender.sendMessage(prefix + " Started Linux webserver (PHP)");
+                        sender.sendMessage(prefix + " Linux php webserver will automatically start itself.");
                     }
                 }else {
                     sender.sendMessage(prefix + " PHP is not enabled!.");
@@ -317,8 +355,7 @@ public class WebCore extends JavaPlugin {
                         sender.sendMessage(prefix + " Reloaded Windows webserver (PHP)");
                     }
                     if (CheckOS.isUnix()) {
-                        LinuxPHPCore.restartLinuxPHP();
-                        sender.sendMessage(prefix + " Reloaded Linux webserver (PHP)");
+                        sender.sendMessage(prefix + " Reload not possible anymore on Linux webserver (PHP)");
                     }
                 }else {
                     sender.sendMessage(prefix + " PHP is not enabled!.");
@@ -369,29 +406,85 @@ public class WebCore extends JavaPlugin {
 
         commandManager.register("", ((sender, params) -> {
             if (!(sender instanceof Player)){
-                if (getConfig().getString("Settings.ServerIP").equalsIgnoreCase("localhost")){
-                    sender.sendMessage(prefix + ChatColor.RED + " ServerIP not changed in config!");
-                    sender.sendMessage(prefix + " Webserver info: ");
-                    if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
-                        sender.sendMessage("");
-                    }
-                }else {
-                    sender.sendMessage(prefix + " Webserver info: ");
-                    if (getConfig().getBoolean("SSLSettings.EnableSSL")){
+                if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
+                    boolean enablePHP = getConfig().getBoolean("Settings.EnablePHP");
+                    boolean enableHTML = getConfig().getBoolean("Settings.EnableHTML");
+                    String serverIP = getConfig().getString("Settings.ServerIP");
 
+                    if (enablePHP && enableHTML) {
+                        // Both PHP and HTML are enabled
+                        sender.sendMessage(prefix + " URL HTML: https://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enablePHP) {
+                        // Only PHP is enabled
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enableHTML) {
+                        // Only HTML is enabled
+                        sender.sendMessage(prefix + " URL HTML: https://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                    } else {
+                        // Neither PHP nor HTML is enabled
+                        sender.sendMessage(prefix + " Both PHP and HTML are disabled.");
+                    }
+                }else{
+
+                    boolean enablePHP = getConfig().getBoolean("Settings.EnablePHP");
+                    boolean enableHTML = getConfig().getBoolean("Settings.EnableHTML");
+                    String serverIP = getConfig().getString("Settings.ServerIP");
+
+                    if (enablePHP && enableHTML) {
+                        // Both PHP and HTML are enabled
+                        sender.sendMessage(prefix + " URL HTML: http://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enablePHP) {
+                        // Only PHP is enabled
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enableHTML) {
+                        // Only HTML is enabled
+                        sender.sendMessage(prefix + " URL HTML: http://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                    } else {
+                        // Neither PHP nor HTML is enabled
+                        sender.sendMessage(prefix + " Both PHP and HTML are disabled.");
                     }
                 }
             }else{
-                if (getConfig().getString("Settings.ServerIP").equalsIgnoreCase("localhost")){
-                    sender.sendMessage(prefix + ChatColor.RED + " ServerIP not changed in config!");
-                    sender.sendMessage(prefix + " Webserver info: ");
-                    if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
-                        sender.sendMessage("");
-                    }
-                }else {
-                    sender.sendMessage(prefix + " Webserver info: ");
-                    if (getConfig().getBoolean("SSLSettings.EnableSSL")){
+                if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
+                    boolean enablePHP = getConfig().getBoolean("Settings.EnablePHP");
+                    boolean enableHTML = getConfig().getBoolean("Settings.EnableHTML");
+                    String serverIP = getConfig().getString("Settings.ServerIP");
 
+                    if (enablePHP && enableHTML) {
+                        // Both PHP and HTML are enabled
+                        sender.sendMessage(prefix + " URL HTML: https://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enablePHP) {
+                        // Only PHP is enabled
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enableHTML) {
+                        // Only HTML is enabled
+                        sender.sendMessage(prefix + " URL HTML: https://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                    } else {
+                        // Neither PHP nor HTML is enabled
+                        sender.sendMessage(prefix + " Both PHP and HTML are disabled.");
+                    }
+                }else{
+
+                    boolean enablePHP = getConfig().getBoolean("Settings.EnablePHP");
+                    boolean enableHTML = getConfig().getBoolean("Settings.EnableHTML");
+                    String serverIP = getConfig().getString("Settings.ServerIP");
+
+                    if (enablePHP && enableHTML) {
+                        // Both PHP and HTML are enabled
+                        sender.sendMessage(prefix + " URL HTML: http://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enablePHP) {
+                        // Only PHP is enabled
+                        sender.sendMessage(prefix + " URL PHP: http://" + serverIP + ":" + getConfig().getString("Settings.PHPPort"));
+                    } else if (enableHTML) {
+                        // Only HTML is enabled
+                        sender.sendMessage(prefix + " URL HTML: http://" + serverIP + ":" + getConfig().getString("Settings.HTMLPORT"));
+                    } else {
+                        // Neither PHP nor HTML is enabled
+                        sender.sendMessage(prefix + " Both PHP and HTML are disabled.");
                     }
                 }
             }

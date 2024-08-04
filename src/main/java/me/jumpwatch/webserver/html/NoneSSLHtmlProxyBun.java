@@ -1,7 +1,7 @@
 package me.jumpwatch.webserver.html;
 
-import me.jumpwatch.webserver.proxy.WebCoreProxy;
-import me.jumpwatch.webserver.proxy.WebCoreProxyVel;
+import me.jumpwatch.webserver.WebCoreProxy;
+import me.jumpwatch.webserver.WebCoreProxyVel;
 import me.jumpwatch.webserver.utils.ContentTypeResolver;
 
 import java.io.*;

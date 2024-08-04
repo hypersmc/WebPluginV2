@@ -12,12 +12,24 @@
 Settings:
   HTMLPORT: 25567
   PHPPort: 25568
-  ServerIP: localhost #Used for both PHP and HTML
-  debug: false #Only enable if I need debug logs.
-  EnablePHP: false
-  EnableHTML: true
-  Autokey: false #Don't enable as it's still WIP.
 
+  ServerIP: localhost
+  ServerIPComment: Used for both PHP and HTML in the command /webp (only spigot/bukkit and such NOT Proxy) WebPlugin binds webservers to the 0.0.0.0 (servers ip)
+
+  debug: false
+  debugcomment: Only enable if I need debug logs or if you can figure out debug info yourself. This will NOT make a debug.log file it will post in console.
+
+  EnablePHP: false
+  PHPComment: If you use linux a fair warning here! WebPlugin WILL download a file from its distro on github (see bellow) this file is a precompiled version of php 8.2 for linux. If you don't agree with this download please don't enable!
+  GithubWebPluginPHPRepo: https://github.com/hypersmc/WebPluginV2Repo
+  GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz
+  GithubWebPluginComment: If this file name doesn't match the one downloaded then I either forgot to update this or something happened on the repo. Report it to me on discord :)
+
+  EnableHTML: true
+  HTMLComment: If you have PHP enabled you don't need html enabled as PHP can also handle HTML code.
+
+  Autokey: false
+  AutoKeyComment: Don't enable as it's still WIP.
 SSLSettings: #PEM Key required!
   EnableSSL: false
   SSLPort: 25570
@@ -29,4 +41,4 @@ Linuxphpsettings:
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 10
+ConfigVersion: 11

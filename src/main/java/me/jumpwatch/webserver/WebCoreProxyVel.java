@@ -1,4 +1,4 @@
-package me.jumpwatch.webserver.proxy;
+package me.jumpwatch.webserver;
 
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
@@ -8,8 +8,12 @@ import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import me.jumpwatch.webserver.html.NoneSSLHtmlProxyVel;
+import me.jumpwatch.webserver.php.linux.PhpInstaller;
+import me.jumpwatch.webserver.php.linux.PHPWebServerVel;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.ContentTypeResolver;
+import org.bstats.velocity.Metrics;
+import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import javax.inject.Inject;
@@ -20,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -28,22 +33,26 @@ import java.util.logging.Logger;
  * @Project WebPluginV2
  * v1.0.0
  */
-@Plugin(id= "webplugin", name = "webplugin", version = "2.4R", authors = "JumpWatch, HypersMC, HumpJump")
+@Plugin(id= "webplugin", name = "webplugin", version = "2.5R", authors = "JumpWatch, HypersMC, HumpJump")
 public class WebCoreProxyVel  {
-    public String pluginversion = "2.4R";
+    private static final org.slf4j.Logger log = LoggerFactory.getLogger(WebCoreProxyVel.class);
+    public String pluginversion = "2.5R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
+    private int portphp;
     private WebCoreProxyVel m = this;
     private boolean shutdown = false;
     private Thread acceptor;
     private boolean acceptorRunning;
     private ServerSocket ss;
+    private ServerSocket ssphp;
     public static String ver;
-    private int version = 10;
+    private int version = 11;
     public ContentTypeResolver resolver;
     private ScheduledTask scheduledTask;
     private ScheduledTask scheduledTaskSSL;
     private ScheduledTask acceptorTask;
+    private final Metrics.Factory metricsFactory;
 
 
     public static File dataFolder;
@@ -54,10 +63,12 @@ public class WebCoreProxyVel  {
     public static Map<String, Object> settings;
     public static Map<String, Object> sslSettings;
     public static Map<String, Object> linuxPhpSettings;
+    public boolean debug;
     @Inject
-    public WebCoreProxyVel(ProxyServer proxy, Logger logger, @DataDirectory Path dataFolder) {
+    public WebCoreProxyVel(ProxyServer proxy, Logger logger, @DataDirectory Path dataFolder, Metrics.Factory metricsFactory) {
         this.proxyServer = proxy;
         this.logger = Logger.getLogger("WebPluginProxyVel");
+        this.metricsFactory = metricsFactory;
         WebCoreProxyVel.dataFolder = dataFolder.toFile();
     }
     private void setphpfiles(){
@@ -98,8 +109,11 @@ public class WebCoreProxyVel  {
     }
 
     @Subscribe //Velocity
-    public void onProxyInitialization(ProxyInitializeEvent event) {
-        logger.info("WebPluginProxy initialized");
+    public void onProxyInitialization(ProxyInitializeEvent event) throws IOException {
+        logger.info("WebPluginProxy initializing");
+        checkAndUpdateConfig();
+        int pluginid = 22871;
+        Metrics metrics = metricsFactory.make(this, pluginid);
         loadConfig();
         loadMime();
         resolver = new ContentTypeResolver();
@@ -110,6 +124,7 @@ public class WebCoreProxyVel  {
         sslSettings = (Map<String, Object>) config.get("SSLSettings");
         //noinspection unchecked
         linuxPhpSettings = (Map<String, Object>) config.get("Linuxphpsettings");
+        debug = (Boolean) settings.get("debug");
         this.shutdown = false;
         logger.info("Current OS: " + CheckOS.OS);
         logger.info("Is running Docker: " + CheckOS.isRunningInsideDocker());
@@ -141,6 +156,24 @@ public class WebCoreProxyVel  {
         if (CheckOS.isWindows()) {
             logger.severe("Currently i cannot make php work on windows in a proxy server.");
         }
+        if (settings.get("PHPPort") != null){
+            try {
+                portphp = (int) settings.get("PHPPort");
+                ssphp = new ServerSocket(portphp);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }else {
+            if (settings.get("PHPPort") == null){
+                logger.severe("Port not found! Using internal default port!");
+                try {
+                    portphp = (int) 25568;
+                    ssphp = new ServerSocket(portphp);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
         if (settings.get("HTMLPORT") != null){
             try {
                 listeningport = (int) settings.get("HTMLPORT");
@@ -162,14 +195,15 @@ public class WebCoreProxyVel  {
         if (CheckOS.isWindows()){
             Startwebserverhtml();
             //Startwebserverphp();
-            //I'm currently unable to make PHP work because I can't access libraries the same way as on SpigotMC.
+            //I'm currently unable to make PHP work because I can't access libraries the same way as on SpigotMC. An alternative fix is under way :)
+            //It's not prioritized as most hosts are using linux docker containers
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
-            //StartwebserverphpLinux();
-            //I'm currently unable to make PHP work because I can't access libraries the same way as on SpigotMC.
+            StartwebserverphpLinux();
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
+                logger.info("It's recommended to run minecraft servers in docker containers.");
             }
         }
 
@@ -189,6 +223,9 @@ public class WebCoreProxyVel  {
 //        logger.info("Config Version: " + configversion);
 
     }
+
+
+
     public String getName() {
         return getClass().getAnnotation(Plugin.class).name();
     }
@@ -284,6 +321,34 @@ public class WebCoreProxyVel  {
             logger.severe("Failed to save resource " + resourcePath);
         }
     }
+    private void StartwebserverphpLinux() {
+        boolean enablePHP = (boolean) settings.get("EnablePHP");
+        if (enablePHP) {
+            if (!new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+                PhpInstaller.installphp();
+                PhpInstaller.FilePermissions(); //Extra check as you never know :)
+                if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+                    startwebserverphp();
+                }
+            } else {
+                startwebserverphp();
+            }
+        }
+    }
+    private void startwebserverphp() {
+        acceptorRunning = true;
+        acceptorTask = proxyServer.getScheduler().buildTask(this, () -> {
+            while (acceptorRunning) {
+                try {
+                    Socket sock = ssphp.accept();
+                    new PHPWebServerVel(sock, m).start();
+                } catch (IOException e) {
+                    logger.severe("Error accepting socket connection");
+                    if (debug) e.printStackTrace();
+                }
+            }
+        }).schedule(); // Adjust delay as necessary
+    }
     private void Startwebserverhtml(){
         acceptorRunning = true;
         boolean enableHTML = (Boolean) settings.get("EnableHTML");
@@ -304,6 +369,7 @@ public class WebCoreProxyVel  {
                                 new NoneSSLHtmlProxyVel(sock, m).start();
                             } catch (IOException e) {
                                 logger.severe("Error accepting socket connection");
+                                if (debug) e.printStackTrace();
                             }
                         }
                     } catch (Exception e) {
@@ -311,6 +377,66 @@ public class WebCoreProxyVel  {
                     }
                 }).schedule(); // Adjust delay as necessary
             }
+        }
+    }
+    private void checkAndUpdateConfig() {
+        File configFile = new File(dataFolder.toPath().toFile(), "config.yml");
+        File backupFile = new File(dataFolder.toPath().toFile(), "config_backup.yml");
+        logger.info("Checking config version!");
+        if (!configFile.exists()) {
+            logger.warning("No config version found. Either config corrupt or never existed.");
+            // If config doesn't exist, copy the default config
+            copyDefaultConfig(configFile);
+        } else {
+            // Config exists, check version
+            int configVersion = getConfigVersion(configFile);
+            if (configVersion == -99 || configVersion != version) {
+                logger.warning("Config is not right. Config is missing an update or you changed it!");
+                logger.info("An backup will be made!");
+                logger.info("Making backup!");
+                // Backup old config and replace with default
+                backupOldConfig(configFile, backupFile);
+                logger.info("Done!");
+                logger.info("Config was not up to date!");
+                logger.info("Recreating!");
+                copyDefaultConfig(configFile);
+            }else{
+                logger.info("Config is up to date!");
+            }
+        }
+    }
+    private int getConfigVersion(File configFile) {
+        try {
+            Properties properties = new Properties();
+            properties.load(Files.newInputStream(configFile.toPath()));
+            return Integer.parseInt(properties.getProperty("ConfigVersion"));
+        } catch (IOException e) {
+            logger.severe("Error reading config version");
+            return -99;
+        }
+    }
+
+    private void backupOldConfig(File configFile, File backupFile) {
+        try {
+            if (configFile.exists()) {
+                Files.copy(configFile.toPath(), backupFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                logger.info("Backed up old config to " + backupFile.getPath());
+            }
+        } catch (IOException e) {
+            logger.severe("Error backing up old config");
+        }
+    }
+
+    private void copyDefaultConfig(File configFile) {
+        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+            if (inputStream == null) {
+                logger.severe("Default config file not found in JAR.");
+                return;
+            }
+            Files.copy(inputStream, configFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            logger.info("Copied default config to " + configFile.getPath());
+        } catch (IOException e) {
+            logger.severe("Error copying default config");
         }
     }
 }
