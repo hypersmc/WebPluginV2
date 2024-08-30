@@ -33,10 +33,10 @@ import java.util.logging.Logger;
  * @Project WebPluginV2
  * v1.0.0
  */
-@Plugin(id= "webplugin", name = "webplugin", version = "2.5R", authors = "JumpWatch, HypersMC, HumpJump")
+@Plugin(id= "webplugin", name = "webplugin", version = "2.6R", authors = "JumpWatch, HypersMC, HumpJump")
 public class WebCoreProxyVel  {
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(WebCoreProxyVel.class);
-    public String pluginversion = "2.5R";
+    public String pluginversion = "2.6R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private int portphp;
@@ -45,9 +45,8 @@ public class WebCoreProxyVel  {
     private Thread acceptor;
     private boolean acceptorRunning;
     private ServerSocket ss;
-    private ServerSocket ssphp;
     public static String ver;
-    private int version = 11;
+    private int version = 12;
     public ContentTypeResolver resolver;
     private ScheduledTask scheduledTask;
     private ScheduledTask scheduledTaskSSL;
@@ -56,7 +55,7 @@ public class WebCoreProxyVel  {
 
 
     public static File dataFolder;
-    private final ProxyServer proxyServer;
+    public final ProxyServer proxyServer;
     private Logger logger;
     public static Map<String, Object> config;
     public static Map<String, Object> mime;
@@ -83,9 +82,11 @@ public class WebCoreProxyVel  {
         logger.info("WebCoreProxyVel is shutting down.");
         boolean enableSSL = (Boolean) sslSettings.get("EnableSSL");
         boolean enableHTML = (Boolean) settings.get("EnableHTML");
+        boolean enablePHP = (Boolean) settings.get("EnablePHP");
 //        scheduledTask.cancel();
         if (enableSSL) scheduledTaskSSL.cancel();
         if (enableHTML) acceptorTask.cancel();
+        if (enablePHP) new PHPWebServerVel(this).stopsystem();
         this.shutdown = true;
         acceptorRunning = false;
         Socket sockCloser;
@@ -155,24 +156,6 @@ public class WebCoreProxyVel  {
         }
         if (CheckOS.isWindows()) {
             logger.severe("Currently i cannot make php work on windows in a proxy server.");
-        }
-        if (settings.get("PHPPort") != null){
-            try {
-                portphp = (int) settings.get("PHPPort");
-                ssphp = new ServerSocket(portphp);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }else {
-            if (settings.get("PHPPort") == null){
-                logger.severe("Port not found! Using internal default port!");
-                try {
-                    portphp = (int) 25568;
-                    ssphp = new ServerSocket(portphp);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
         }
         if (settings.get("HTMLPORT") != null){
             try {
@@ -328,26 +311,12 @@ public class WebCoreProxyVel  {
                 PhpInstaller.installphp();
                 PhpInstaller.FilePermissions(); //Extra check as you never know :)
                 if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
-                    startwebserverphp();
+                    new PHPWebServerVel(this).start();
                 }
             } else {
-                startwebserverphp();
+                new PHPWebServerVel(this).start();
             }
         }
-    }
-    private void startwebserverphp() {
-        acceptorRunning = true;
-        acceptorTask = proxyServer.getScheduler().buildTask(this, () -> {
-            while (acceptorRunning) {
-                try {
-                    Socket sock = ssphp.accept();
-                    new PHPWebServerVel(sock, m).start();
-                } catch (IOException e) {
-                    logger.severe("Error accepting socket connection");
-                    if (debug) e.printStackTrace();
-                }
-            }
-        }).schedule(); // Adjust delay as necessary
     }
     private void Startwebserverhtml(){
         acceptorRunning = true;

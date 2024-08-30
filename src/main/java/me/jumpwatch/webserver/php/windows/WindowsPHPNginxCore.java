@@ -51,7 +51,7 @@ public class WindowsPHPNginxCore {
         WebCore main = JavaPlugin.getPlugin(WebCore.class);
         String Nginx = main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/nginx.exe -s reload -p " + main.getDataFolder() + "/phpwindows/nginx/nginx-1.25.4/";
         String PHPStop = "CMD /C taskkill /f /IM php.exe /T";
-        String PHPStart = main.getDataFolder() + "/phpwindows/php/php.exe -S " + main.getConfig().getString("Settings.ServerIP") + ":"+ main.getConfig().getString("Settings.PHPPort") + " -t " + main.getDataFolder() + "/phpwindows/php/public";
+        String PHPStart = main.getDataFolder() + "/phpwindows/php/php.exe -S " + main.getConfig().getString("Settings.ServerIP") + ":"+ main.getConfig().getString("Settings.PHPPorttest") + " -t " + main.getDataFolder() + "/phpwindows/php/public";
         String line;
         try {
             Process PNginx = Runtime.getRuntime().exec(Nginx);

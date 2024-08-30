@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  */
 public class WebCoreProxy extends Plugin {
     public Configuration configuration;
-    public String pluginversion = "2.5R";
+    public String pluginversion = "2.6R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private WebCoreProxy m = this;
@@ -41,9 +41,8 @@ public class WebCoreProxy extends Plugin {
     private Thread acceptor;
     private boolean acceptorRunning;
     private ServerSocket ss;
-    private ServerSocket ssPHP;
     public static String ver;
-    private int version = 11;
+    private int version = 12;
     public ContentTypeResolver resolver;
     private Logger logger = Logger.getLogger("WebPluginProxyBun");
     public static File dataFolder;
@@ -104,24 +103,6 @@ public class WebCoreProxy extends Plugin {
                 try {
                     listeningport = 25567;
                     ss = new ServerSocket(listeningport);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        if (configuration.getString("Settings.PHPPort") != null){
-            try {
-                listeningport = (int) configuration.getInt("Settings.PHPPort");
-                ssPHP = new ServerSocket(listeningport);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }else{
-            if (configuration.getString("Settings.PHPPort") == null){
-                logger.severe("Port not found! Using internal default port!");
-                try {
-                    listeningport = 25568;
-                    ssPHP = new ServerSocket(listeningport);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -232,25 +213,12 @@ public class WebCoreProxy extends Plugin {
                 PhpInstaller.installphp();
                 PhpInstaller.FilePermissions(); //Extra check as you never know :)
                 if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
-                    startwebserverphp();
+                    new PHPWebServerBun(this).start();
                 }
             } else {
-                startwebserverphp();
+                new PHPWebServerBun(this).start();
             }
         }
-    }
-    private void startwebserverphp() {
-        acceptorRunning = true;
-        ProxyServer.getInstance().getScheduler().schedule(this, () -> {
-            while (acceptorRunning) {
-                try {
-                    Socket sock = ssPHP.accept();
-                    new PHPWebServerBun(sock, m).start();
-                } catch (IOException e) {
-                    logger.severe("Error accepting socket connection");
-                }
-            }
-        }, 1l, TimeUnit.MILLISECONDS);
     }
     private void checkAndUpdateConfig() {
         File configFile = new File(dataFolder.toPath().toFile(), "config.yml");

@@ -9,10 +9,16 @@
 #                                                             $$\   $$ |
 #                                                             \$$$$$$  |
 #                                                              \______/
+#Discord support: https://discord.gg/9HDFz9vyv4
 Settings:
   HTMLPORT: 25567
   PHPPort: 25568
-
+  LocalFPM: 25569
+  LocalFPMComment: It's very important you have a FPM port if you decide to use php.
+  ServerLocation: /home/container/
+  ServerLocationComment: For most users on linux that are in a docker container don't change this. tho if you are NOT on a container please put the path to the server folder.
+  IndexLocation: ""
+  IndexComment: the default path is /webplugin/php/ so "" (yes blank) is in root folder of php. if yours is located in another place do "/path/to/index/folder"
   ServerIP: localhost
   ServerIPComment: Used for both PHP and HTML in the command /webp (only spigot/bukkit and such NOT Proxy) WebPlugin binds webservers to the 0.0.0.0 (servers ip)
 
@@ -20,9 +26,10 @@ Settings:
   debugcomment: Only enable if I need debug logs or if you can figure out debug info yourself. This will NOT make a debug.log file it will post in console.
 
   EnablePHP: false
-  PHPComment: If you use linux a fair warning here! WebPlugin WILL download a file from its distro on github (see bellow) this file is a precompiled version of php 8.2 for linux. If you don't agree with this download please don't enable!
+  PHPComment: If you use linux a fair warning here! WebPlugin WILL download a file from its distro on github (see bellow) this file is a precompiled version of php 8.2 and nginx 1.27.1 for linux. If you don't agree with this download please don't enable!
   GithubWebPluginPHPRepo: https://github.com/hypersmc/WebPluginV2Repo
   GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz
+  GithubWebPluginNGINXRepoFilename: WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz
   GithubWebPluginComment: If this file name doesn't match the one downloaded then I either forgot to update this or something happened on the repo. Report it to me on discord :)
 
   EnableHTML: true
@@ -41,4 +48,4 @@ Linuxphpsettings:
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 11
+ConfigVersion: 12

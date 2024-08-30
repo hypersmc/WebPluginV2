@@ -22,7 +22,7 @@ import static com.google.common.io.Files.getFileExtension;
  */
 public class ContentTypeResolver {
     private Logger logger = Logger.getLogger("WebPluginContentTypeResolver");
-    private Map<String, String> extensionToTypeMap;
+    public static Map<String, String> extensionToTypeMap;
 
     public ContentTypeResolver() {}
 

@@ -44,9 +44,8 @@ public class WebCore extends JavaPlugin {
     private Thread acceptor;
     private boolean acceptorRunning;
     private ServerSocket ss;
-    private ServerSocket ssPHP;
     public static String ver;
-    private int version = 11;
+    private int version = 12;
     private CommandManager commandManager;
     public ContentTypeResolver resolver;
 
@@ -160,28 +159,6 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }
-        if (getConfig().isSet("Settings.PHPPort")) {
-            try {
-                listeningport = getConfig().getInt("Settings.PHPPort");
-                ssPHP = new ServerSocket(listeningport);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }else {
-            if (getConfig().contains("Settings.PHPPort")) {
-                getLogger().warning("Port not found! Using internal default port!");
-                try {
-                    listeningport = 25568;
-                    ssPHP = new ServerSocket(listeningport);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }else {
-                getLogger().warning("Plugin disabled! NO VALUE WAS FOUND FOR LISTENING PORT!");
-                Bukkit.getPluginManager().disablePlugin(this);
-                return;
-            }
-        }
         if (CheckOS.isWindows()) {
             Startwebserverhtml();
             Startwebserverphp();
@@ -243,28 +220,12 @@ public class WebCore extends JavaPlugin {
                 PhpInstaller.installphp();
                 PhpInstaller.FilePermissions(); //Extra check as you never know :)
                 if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
-                    startwebserverphp();
+                    new PHPWebServer(this).start();
                 }
             } else {
-                startwebserverphp();
+                new PHPWebServer(this).start();
             }
         }
-    }
-    private void startwebserverphp() {
-        acceptorRunning = true;
-        new BukkitRunnable() {
-            @Override
-            public void run() {
-                while (acceptorRunning) {
-                    try {
-                        Socket sock = ssPHP.accept();
-                        new PHPWebServer(sock, m).start();
-                    } catch (IOException e) {
-                        getLogger().severe("Error accepting socket connection");
-                    }
-                }
-            }
-        }.runTaskAsynchronously(this);
     }
     private void Startwebserverhtml(){
         acceptorRunning = true;
