@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  */
 public class WebCoreProxy extends Plugin {
     public Configuration configuration;
-    public String pluginversion = "2.6R";
+    public String pluginversion = "2.6.1R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private WebCoreProxy m = this;

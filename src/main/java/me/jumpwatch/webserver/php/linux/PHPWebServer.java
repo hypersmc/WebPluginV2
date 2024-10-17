@@ -48,6 +48,7 @@ public class PHPWebServer{
             updateEntireNGINXConfig(path2, PHPPort, FPMPort, IndexLocation, ServerIP, main, ServerPath);
             updateCGIConfig(path3, ServerSoftware);
             updateCGIParms(path4, ServerSoftware);
+            fixlibrary();
             return true;
         } catch (Exception e) {
             return false;
@@ -306,5 +307,42 @@ public class PHPWebServer{
 
             }
         }.runTaskAsynchronously(main);
+    }
+    public static void fixlibrary() {
+        String[] cmd = {
+                "/bin/sh", "-c",
+                "export LD_LIBRARY_PATH=/home/container/plugins/webplugin/phplinux/bin/php8/lib:$LD_LIBRARY_PATH\n"
+        };
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(cmd);
+
+            // Read output streams
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = stdInput.readLine()) != null) {
+                logger.info(line);
+                output.append(line).append("\n");
+            }
+
+            // Read any errors
+            while ((line = stdError.readLine()) != null) {
+                logger.warning(line);
+                output.append(line).append("\n");
+            }
+
+            int exitCode = p.waitFor();
+            logger.info("Process exited with code: " + exitCode);
+        } catch (IOException | InterruptedException e) {
+//            logger.severe(e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (p != null) {
+                p.destroy();
+            }
+        }
     }
 }

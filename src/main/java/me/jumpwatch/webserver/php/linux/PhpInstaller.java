@@ -24,7 +24,10 @@ public class PhpInstaller {
                         "cp ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.conf.default ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.conf \n" +
                         "cp ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.d/www.conf.default ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.d/www.conf \n" +
                         "mkdir ~/plugins/webplugin/phplinux/bin/php8/log \n" +
-                        "touch ~/plugins/webplugin/phplinux/bin/php8/log/php-fpm.log \n"
+                        "touch ~/plugins/webplugin/phplinux/bin/php8/log/php-fpm.log \n" +
+                        "cd /usr/lib/x86_64-linux-gnu/ \n" +
+                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/libonig.so.5 \n" +
+                        "export LD_LIBRARY_PATH=/home/container/plugins/webplugin/phplinux/bin/php8/lib:$LD_LIBRARY_PATH\n"
         };
         Process p = null;
         try {

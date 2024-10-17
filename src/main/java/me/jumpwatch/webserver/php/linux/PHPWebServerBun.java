@@ -192,18 +192,28 @@ public class PHPWebServerBun{
                         "\n" +
                         "        # List of index files that Nginx will try to serve if a directory is requested\n" +
                         "        index index.php index.html index.htm;\n" +
+                        "        charset utf-8;\n" +
                         "\n" +
                         "        location / {\n" +
-                        "            try_files $uri $uri/ =404;\n" +
+                        "            try_files $uri $uri/ /index.php?$query_string;\n" +
                         "        }\n" +
                         "\n" +
                         "        # Pass PHP requests to PHP-FPM for processing\n" +
                         "        location ~ \\.php$ {\n" +
-                        "            root " + ServerPath + newDocumentRoot + ";  # Same document root as above\n" +  // Replace the document root
+                        "            fastcgi_split_path_info ^(.+\\.php)(/.+)$;\n" +
                         "            fastcgi_pass 127.0.0.1:" + newPhpFpmPort + ";\n" +  // Replace the PHP-FPM port
-                        "            fastcgi_index index.php;\n" +
-                        "            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n" +
                         "            include fastcgi_params;\n" +
+                        "            fastcgi_param PHP_VALUE \"upload_max_filesize = 100M \\n post_max_size=100M\";\n" +
+                        "            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n" +
+                        "            fastcgi_intercept_errors off;\n" +
+                        "            fastcgi_buffer_size 16k;\n" +
+                        "            fastcgi_buffers 4 16k;\n" +
+                        "            fastcgi_connect_timeout 300;\n" +
+                        "            fastcgi_send_timeout 300;\n" +
+                        "            fastcgi_read_timeout 300;\n" +
+                        "        }\n" +
+                        "        location ~ /\\.ht {\n" +
+                        "            deny all;\n" +
                         "        }\n" +
                         "    }\n" +
                         "}\n";

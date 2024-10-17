@@ -16,7 +16,7 @@ import org.bstats.velocity.Metrics;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
-import javax.inject.Inject;
+import com.google.inject.Inject;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -33,10 +33,10 @@ import java.util.logging.Logger;
  * @Project WebPluginV2
  * v1.0.0
  */
-@Plugin(id= "webplugin", name = "webplugin", version = "2.6R", authors = "JumpWatch, HypersMC, HumpJump")
+@Plugin(id= "webplugin", name = "webplugin", version = "2.6.1R", authors = "JumpWatch, HypersMC, HumpJump")
 public class WebCoreProxyVel  {
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(WebCoreProxyVel.class);
-    public String pluginversion = "2.6R";
+    public String pluginversion = "2.6.1R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private int portphp;
