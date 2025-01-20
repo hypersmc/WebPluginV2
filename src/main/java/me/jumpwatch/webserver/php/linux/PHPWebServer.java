@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 /**
@@ -218,95 +219,29 @@ public class PHPWebServer{
         // Write the new configuration to the file
         Files.write(configFile.toPath(), newConfig.getBytes());
     }
-    private void startphpfpm(){
-        new BukkitRunnable() {
-            @Override
-            public void run(){
-
-                String[] cmd = {
-                        "/bin/sh", "-c",
-                        "cd ~/plugins/webplugin/phplinux/bin/php8/sbin/ \n" +
-                                "./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
-                };
-                Process p = null;
-                try {
-                    p = Runtime.getRuntime().exec(cmd);
-
-                    // Read output streams
-                    BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                    BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-                    StringBuilder output = new StringBuilder();
-                    String line;
-                    while ((line = stdInput.readLine()) != null) {
-                        output.append(line).append("\n");
-                    }
-
-                    // Read any errors
-                    while ((line = stdError.readLine()) != null) {
-                        output.append(line).append("\n");
-                    }
-
-                    int exitCode = p.waitFor();
-                    logger.info("Output: " + output.toString());
-                    logger.info("Process exited with code: " + exitCode);
-
-                } catch (IOException | InterruptedException e) {
-                    logger.severe(e.getMessage());
-                    e.printStackTrace();
-                } finally {
-                    if (p != null) {
-                        p.destroy();
-                    }
+    private void startphpfpm() {
+        if (isFolia()) {
+            CompletableFuture.runAsync(this::runPHPFPM);
+        } else {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    runPHPFPM();
                 }
-
-            }
-        }.runTaskAsynchronously(main);
+            }.runTaskAsynchronously(main);
+        }
     }
     private void startnginxfpm(){
-        new BukkitRunnable() {
-            @Override
-            public void run(){
-
-                String[] cmd = {
-                        "/bin/sh", "-c",
-                        "cd ~/plugins/webplugin/nginxlinux/bin/nginx/sbin/ \n" +
-                                "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf"
-                };
-                Process p = null;
-                try {
-                    p = Runtime.getRuntime().exec(cmd);
-
-                    // Read output streams
-                    BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                    BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-                    StringBuilder output = new StringBuilder();
-                    String line;
-                    while ((line = stdInput.readLine()) != null) {
-                        output.append(line).append("\n");
-                    }
-
-                    // Read any errors
-                    while ((line = stdError.readLine()) != null) {
-                        output.append(line).append("\n");
-                    }
-
-                    int exitCode = p.waitFor();
-                    logger.info("Output: " + output.toString());
-                    logger.info("Process exited with code: " + exitCode);
-
-                } catch (IOException | InterruptedException e) {
-                    logger.severe(e.getMessage());
-                    e.printStackTrace();
-                } finally {
-                    if (p != null) {
-                        p.destroy();
-                    }
+        if (isFolia()){
+            CompletableFuture.runAsync(this::runNGINX);
+        }else {
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    runNGINX();
                 }
-
-            }
-        }.runTaskAsynchronously(main);
+            }.runTaskAsynchronously(main);
+        }
     }
     public static void fixlibrary() {
         String[] cmd = {
@@ -338,6 +273,93 @@ public class PHPWebServer{
             logger.info("Process exited with code: " + exitCode);
         } catch (IOException | InterruptedException e) {
 //            logger.severe(e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (p != null) {
+                p.destroy();
+            }
+        }
+    }
+    private boolean isFolia() {
+        try {
+            // Check if the RegionScheduler class exists (specific to Folia)
+            Class.forName("io.papermc.paper.threadedregions.scheduler.RegionScheduler");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false; // Not running on Folia
+        }
+    }
+
+    private void runPHPFPM(){
+        String[] cmd = {
+                "/bin/sh", "-c",
+                "cd ~/plugins/webplugin/phplinux/bin/php8/sbin/ \n" +
+                        "./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
+        };
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(cmd);
+
+            // Read output streams
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = stdInput.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+
+            // Read any errors
+            while ((line = stdError.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+
+            int exitCode = p.waitFor();
+            logger.info("Output: " + output.toString());
+            logger.info("Process exited with code: " + exitCode);
+
+        } catch (IOException | InterruptedException e) {
+            logger.severe(e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (p != null) {
+                p.destroy();
+            }
+        }
+    }
+
+    private void runNGINX(){
+        String[] cmd = {
+                "/bin/sh", "-c",
+                "cd ~/plugins/webplugin/nginxlinux/bin/nginx/sbin/ \n" +
+                        "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf"
+        };
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(cmd);
+
+            // Read output streams
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = stdInput.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+
+            // Read any errors
+            while ((line = stdError.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+
+            int exitCode = p.waitFor();
+            logger.info("Output: " + output.toString());
+            logger.info("Process exited with code: " + exitCode);
+
+        } catch (IOException | InterruptedException e) {
+            logger.severe(e.getMessage());
             e.printStackTrace();
         } finally {
             if (p != null) {

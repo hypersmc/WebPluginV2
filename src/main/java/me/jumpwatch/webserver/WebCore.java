@@ -174,8 +174,10 @@ public class WebCore extends JavaPlugin {
     }
     @Override
     public void onDisable() {
-        Bukkit.getScheduler().cancelTasks(m);
-        Bukkit.getScheduler().cancelTasks(this);
+        if (!isFolia()) {
+            Bukkit.getScheduler().cancelTasks(m); //problem in folia
+            Bukkit.getScheduler().cancelTasks(this); //problem in folia
+        }
         this.shutdown = true;
         acceptorRunning = false;
         Socket sockCloser;
@@ -512,5 +514,13 @@ public class WebCore extends JavaPlugin {
             return (sender instanceof Player);
         }
     }
-
+    private boolean isFolia() {
+        try {
+            // Check if the RegionScheduler class exists (specific to Folia)
+            Class.forName("io.papermc.paper.threadedregions.scheduler.RegionScheduler");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false; // Not running on Folia
+        }
+    }
 }

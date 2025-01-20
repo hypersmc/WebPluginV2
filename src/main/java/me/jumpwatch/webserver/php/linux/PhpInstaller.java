@@ -70,8 +70,8 @@ public class PhpInstaller {
                         "cd ~/plugins/webplugin/nginxlinux \n" +
                         "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz \n" +
                         "tar -xzvf WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz \n" +
-                        "mkdir ~/plugins/webplugin/nginxlinux/nginx/logs \n" +
-                        "touch ~/plugins/webplugin/nginxlinux/nginx/logs/error.log \n"
+                        "mkdir ~/plugins/webplugin/nginxlinux/bin/nginx/logs \n" +
+                        "touch ~/plugins/webplugin/nginxlinux/bin/nginx/logs/error.log \n"
         };
         Process p = null;
         try {
