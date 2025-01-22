@@ -16,7 +16,7 @@ Settings:
   LocalFPM: 25569
   LocalFPMComment: It's very important you have a FPM port if you decide to use php.
   ServerLocation: /home/container/
-  ServerLocationComment: For most users on linux that are in a docker container don't change this. tho if you are NOT on a container please put the path to the server folder.
+  ServerLocationComment: For most users on linux that are in a docker container don't change this. tho if you are NOT on a container please put the path to the server folder. Remember the / at the end
   IndexLocation: ""
   IndexComment: the default path is /webplugin/php/ so "" (yes blank) is in root folder of php. if yours is located in another place do "/path/to/index/folder"
   ServerIP: localhost
@@ -28,10 +28,10 @@ Settings:
   EnablePHP: false
   PHPComment: If you use linux a fair warning here! WebPlugin WILL download a file from its distro on github (see bellow) this file is a precompiled version of php 8.2 and nginx 1.27.1 for linux. If you don't agree with this download please don't enable!
   GithubWebPluginPHPRepo: https://github.com/hypersmc/WebPluginV2Repo
-  GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz
+  GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.2-PRECOMPILED-NEW.tar.gz
   GithubWebPluginNGINXRepoFilename: WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz
   GithubWebPluginComment: If this file name doesn't match the one downloaded then I either forgot to update this or something happened on the repo. Report it to me on discord :)
-
+  Comment: I got a lot of libs in the repo too like GLIBC, LIBONIG and LIBZ all of these are needed for the system to work now.
   EnableHTML: true
   HTMLComment: If you have PHP enabled you don't need html enabled as PHP can also handle HTML code.
 
@@ -48,4 +48,4 @@ Linuxphpsettings:
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 12
+ConfigVersion: 13

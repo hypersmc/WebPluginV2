@@ -1,10 +1,14 @@
 package me.jumpwatch.webserver.php.linux;
 
 
+import me.jumpwatch.webserver.WebCore;
+import org.bukkit.plugin.java.JavaPlugin;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.Objects;
 import java.util.logging.Logger;
 
 /**
@@ -15,19 +19,17 @@ import java.util.logging.Logger;
 public class PhpInstaller {
     private static Logger logger = Logger.getLogger("WebPluginPHPInstaller");
     public static void installphp() {
+        WebCore main = JavaPlugin.getPlugin(WebCore.class);
         String[] cmd = {
                 "/bin/sh", "-c",
                 "mkdir ~/plugins/webplugin/phplinux \n" +
                         "cd ~/plugins/webplugin/phplinux \n" +
-                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz \n" +
-                        "tar -xzvf WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz \n" +
+                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/"+ Objects.requireNonNullElse(main.getConfig().getString("Settings.GithubWebPluginPHPRepoFilename"), "WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz") + " \n" +
+                        "tar -xzvf " + Objects.requireNonNullElse(main.getConfig().getString("Settings.GithubWebPluginPHPRepoFilename"), "WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz") + " \n" +
                         "cp ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.conf.default ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.conf \n" +
                         "cp ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.d/www.conf.default ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.d/www.conf \n" +
                         "mkdir ~/plugins/webplugin/phplinux/bin/php8/log \n" +
-                        "touch ~/plugins/webplugin/phplinux/bin/php8/log/php-fpm.log \n" +
-                        "cd /usr/lib/x86_64-linux-gnu/ \n" +
-                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/libonig.so.5 \n" +
-                        "export LD_LIBRARY_PATH=/home/container/plugins/webplugin/phplinux/bin/php8/lib:$LD_LIBRARY_PATH\n"
+                        "touch ~/plugins/webplugin/phplinux/bin/php8/log/php-fpm.log \n"
         };
         Process p = null;
         try {
@@ -97,7 +99,7 @@ public class PhpInstaller {
             int exitCode = p.waitFor();
             logger.info("Process exited with code: " + exitCode);
             FilePermissionsNGINX();
-
+            installglibc();
         } catch (IOException | InterruptedException e) {
 //            logger.severe(e.getMessage());
             e.printStackTrace();
@@ -107,48 +109,174 @@ public class PhpInstaller {
             }
         }
     }
-//    public static void test(){
-//        int listeningport = (int) WebCoreProxyVel.settings.get("PHPPort");
-//        String documentRoot = WebCoreProxyVel.dataFolder + "/php/index.php";
-//        String[] cmd = {
-//                "/bin/sh", "-c",
-//                "cd ~/php/bin/php8/bin/ \n" +
-//                "./php " + "~/plugins/webplugin/php/index.php"
-//        };
-//
-//        Process p = null;
-//        try {
-//            p = Runtime.getRuntime().exec(cmd);
-//
-//            // Read output streams
-//            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-//            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-//
-//            StringBuilder output = new StringBuilder();
-//            String line;
-//            while ((line = stdInput.readLine()) != null) {
-//                logger.info(line);
-//                output.append(line).append("\n");
-//            }
-//
-//            // Read any errors
-//            while ((line = stdError.readLine()) != null) {
-//                logger.warning(line);
-//                output.append(line).append("\n");
-//            }
-//
-//            int exitCode = p.waitFor();
-//            logger.info("Process exited with code: " + exitCode);
-//        } catch (IOException | InterruptedException e) {
+    public static void installlibonig(){
+        String[] cmd = {
+                "/bin/sh", "-c",
+                "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/ \n" +
+                        "mkdir /home/container/plugins/webplugin/phplinux/bin/php8/lib/libonig/ \n" +
+                        "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/libonig/ \n" +
+                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-LIBONIG-PRECOMPILED.tar.gz \n"+
+                        "tar -xzvf WebPlugin-linux-LIBONIG-PRECOMPILED.tar.gz \n"
+        };
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(cmd);
+
+            // Read output streams
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = stdInput.readLine()) != null) {
+                logger.info(line);
+                output.append(line).append("\n");
+            }
+
+            // Read any errors
+            while ((line = stdError.readLine()) != null) {
+                logger.warning(line);
+                output.append(line).append("\n");
+            }
+
+            int exitCode = p.waitFor();
+            logger.info("Process exited with code: " + exitCode);
+            FilePermissionsLIBONIG();
+            installlibz();
+        } catch (IOException | InterruptedException e) {
 //            logger.severe(e.getMessage());
-//            e.printStackTrace();
-//        } finally {
-//            if (p != null) {
-//                p.destroy();
-//            }
-//        }
-//
-//    }
+            e.printStackTrace();
+        } finally {
+            if (p != null) {
+                p.destroy();
+            }
+        }
+    }
+    public static void installlibz(){
+        String[] cmd = {
+                "/bin/sh", "-c",
+                "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/ \n" +
+                        "mkdir /home/container/plugins/webplugin/phplinux/bin/php8/lib/libz/ \n" +
+                        "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/libz/ \n" +
+                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-LIBZ-PRECOMPILED.tar.gz \n"+
+                        "tar -xzvf WebPlugin-linux-LIBZ-PRECOMPILED.tar.gz \n"
+        };
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(cmd);
+
+            // Read output streams
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = stdInput.readLine()) != null) {
+                logger.info(line);
+                output.append(line).append("\n");
+            }
+
+            // Read any errors
+            while ((line = stdError.readLine()) != null) {
+                logger.warning(line);
+                output.append(line).append("\n");
+            }
+
+            int exitCode = p.waitFor();
+            logger.info("Process exited with code: " + exitCode);
+            FilePermissionsLIBZ();
+        } catch (IOException | InterruptedException e) {
+//            logger.severe(e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (p != null) {
+                p.destroy();
+            }
+        }
+    }
+    public static void installglibc(){
+        String[] cmd = {
+                "/bin/sh", "-c",
+                "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/ \n" +
+                        "mkdir /home/container/plugins/webplugin/phplinux/bin/php8/lib/glibc/ \n" +
+                        "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/glibc/ \n" +
+                "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-GLIBC-PRECOMPILED.tar.gz \n"+
+                "tar -xzvf WebPlugin-linux-GLIBC-PRECOMPILED.tar.gz \n"
+        };
+        Process p = null;
+        try {
+            p = Runtime.getRuntime().exec(cmd);
+
+            // Read output streams
+            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = stdInput.readLine()) != null) {
+                logger.info(line);
+                output.append(line).append("\n");
+            }
+
+            // Read any errors
+            while ((line = stdError.readLine()) != null) {
+                logger.warning(line);
+                output.append(line).append("\n");
+            }
+
+            int exitCode = p.waitFor();
+            logger.info("Process exited with code: " + exitCode);
+            FilePermissionsGLIBC();
+            installlibonig();
+        } catch (IOException | InterruptedException e) {
+//            logger.severe(e.getMessage());
+            e.printStackTrace();
+        } finally {
+            if (p != null) {
+                p.destroy();
+            }
+        }
+    }
+
+    public static void FilePermissionsGLIBC(){
+        File php = new File("plugins/webplugin/phplinux/bin/php8/lib/glibc/lib/libm.so.6");
+        try {
+            php.setExecutable(true, false);
+            php.setReadable(true, false);
+            php.setWritable(true, false);
+            logger.info("File permission check success!");
+            FolderPermissions();
+        } catch (Exception e) {
+            logger.severe("Failed to check file permission. Please enable debug mode.");
+
+        }
+    }
+    public static void FilePermissionsLIBZ(){
+        File php = new File("plugins/webplugin/phplinux/bin/php8/lib/libz/lib/libz.so.1.3.1");
+        try {
+            php.setExecutable(true, false);
+            php.setReadable(true, false);
+            php.setWritable(true, false);
+            logger.info("File permission check success!");
+            FolderPermissions();
+        } catch (Exception e) {
+            logger.severe("Failed to check file permission. Please enable debug mode.");
+
+        }
+    }
+    public static void FilePermissionsLIBONIG(){
+        File php = new File("plugins/webplugin/phplinux/bin/php8/lib/libonig/lib/libonig.so.5.2.0");
+        try {
+            php.setExecutable(true, false);
+            php.setReadable(true, false);
+            php.setWritable(true, false);
+            logger.info("File permission check success!");
+            FolderPermissions();
+        } catch (Exception e) {
+            logger.severe("Failed to check file permission. Please enable debug mode.");
+
+        }
+    }
     public static void FilePermissionsNGINX(){
         File php = new File("plugins/webplugin/nginxlinux/bin/nginx/sbin/nginx");
         try {

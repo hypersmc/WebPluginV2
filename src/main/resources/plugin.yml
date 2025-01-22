@@ -1,6 +1,6 @@
 name: webplugin
 main: me.jumpwatch.webserver.WebCore
-version: 2.7R
+version: 2.8R
 api-version: 1.13
 folia-supported: true
 description: Adds the ability to have an integrated webserver for your minecraft server.

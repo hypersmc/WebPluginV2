@@ -159,7 +159,7 @@ public class PHPWebServer{
         // Define the new configuration template
         String newConfig =
                 "#user  nobody;\n" +
-                        "#Sorry but currently you cannot change this file. IT WILL BE OVERRIDDEN. This allows me to always update the file if you change config.yml \n" +
+                        "#Sorry but currently you cannot change this file. IT WILL BE OVERRIDDEN. This allows me to always update the file if you change config.yml. ssl soon tm \n" +
                         "worker_processes  1;\n" +
                         "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log;\n" +
                         "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  notice;\n" +
@@ -294,7 +294,7 @@ public class PHPWebServer{
         String[] cmd = {
                 "/bin/sh", "-c",
                 "cd ~/plugins/webplugin/phplinux/bin/php8/sbin/ \n" +
-                        "./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
+                        main.getConfig().getString("Settings.ServerLocation") + "plugins/webplugin/phplinux/bin/php8/lib/glibc/lib/ld-linux-x86-64.so.2 --library-path " + main.getConfig().getString("Settings.ServerLocation") + "plugins/webplugin/phplinux/bin/php8/lib/glibc/lib:" + main.getConfig().getString("Settings.ServerLocation") + "plugins/webplugin/phplinux/bin/php8/lib/libonig/lib:/home/container/plugins/webplugin/phplinux/bin/php8/lib/libz/lib ./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
         };
         Process p = null;
         try {
