@@ -33,6 +33,7 @@ public class PHPWebServer{
     private boolean checkConfigBeforeStart(){
         int FPMPort = main.getConfig().getInt("Settings.LocalFPM");
         int PHPPort = main.getConfig().getInt("Settings.PHPPort");
+        int sslPort = main.getConfig().getInt("SSLSettings.SSLPort");
         File path = new File(main.getDataFolder() + "/phplinux/bin/php8/etc/php-fpm.d/www.conf");
         File path1 = new File(main.getDataFolder() + "/phplinux/bin/php8/etc/php-fpm.conf");
         File path2 = new File(main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf");
@@ -43,10 +44,13 @@ public class PHPWebServer{
         String ServerIP = main.getConfig().getString("Settings.ServerIP");
         String fpmd = ServerPath + main.getDataFolder() + "/phplinux/bin/php8/etc/php-fpm.d/*.conf";
         String ServerSoftware = main.getName() + "-" + main.getDescription().getVersion();
+        String sslDomain = main.getConfig().getString("SSLSettings.SSLDomain");
+        String sslPriv = main.getConfig().getString("SSLSettings.SSLPriv");
+        String sslPubl = main.getConfig().getString("SSLSettings.SSLPubl");
         try {
             updatePortInConfig(path, FPMPort);
             updatePathConfig(path1, fpmd);
-            updateEntireNGINXConfig(path2, PHPPort, FPMPort, IndexLocation, ServerIP, main, ServerPath);
+            updateEntireNGINXConfig(path2, PHPPort, FPMPort, IndexLocation, ServerIP, main, ServerPath, sslPort, sslDomain, sslPriv, sslPubl);
             updateCGIConfig(path3, ServerSoftware);
             updateCGIParms(path4, ServerSoftware);
             fixlibrary();
@@ -155,67 +159,154 @@ public class PHPWebServer{
         // Write the new configuration to the file
         Files.write(configFile.toPath(), newConfig.getBytes());
     }
-    private static void updateEntireNGINXConfig(File configFile, int newListenPort, int newPhpFpmPort, String newDocumentRoot, String ServerIP, WebCore main, String ServerPath) throws IOException {
+    private static void updateEntireNGINXConfig(File configFile, int newListenPort, int newPhpFpmPort, String newDocumentRoot, String ServerIP, WebCore main, String ServerPath, int sslPort, String sslDomain, String sslPriv, String sslPubl) throws IOException {
         // Define the new configuration template
-        String newConfig =
-                "#user  nobody;\n" +
-                        "#Sorry but currently you cannot change this file. IT WILL BE OVERRIDDEN. This allows me to always update the file if you change config.yml. ssl soon tm \n" +
-                        "worker_processes  1;\n" +
-                        "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log;\n" +
-                        "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  notice;\n" +
-                        "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  info;\n" +
-                        "pid       " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/nginx.pid;\n" +
-                        "\n" +
-                        "events {\n" +
-                        "    worker_connections  1024;\n" +
-                        "}\n" +
-                        "\n" +
-                        "http {\n" +
-                        "    server_tokens off;\n" +
-                        "    add_header Server \"" + main.getName() + " " + main.getDescription().getVersion() + "\" always;\n" +
-                        "    client_body_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/client_body_temp;\n" +
-                        "    proxy_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/proxy_temp;\n" +
-                        "    fastcgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/fastcgi_temp;\n" +
-                        "    uwsgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/uwsgi_temp;\n" +
-                        "    scgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/scgi_temp;\n" +
-                        "    include       mime.types;\n" +
-                        "    default_type  application/octet-stream;\n" +
-                        "\n" +
-                        "    # Enable logging\n" +
-                        "    access_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/access.log;\n" +
-                        "    access_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/access.log;\n" +
-                        "\n" +
-                        "    sendfile        on;\n" +
-                        "    keepalive_timeout  65;\n" +
-                        "\n" +
-                        "    # Server block for handling requests\n" +
-                        "    server {\n" +
-                        "        server_tokens off;\n" +
-                        "        add_header Server \"" + main.getName() + " " + main.getDescription().getVersion() + "\" always;\n" +
-                        "        listen 0.0.0.0:" + newListenPort + ";\n" +  // Replace the listen port
-                        "        server_name " + ServerIP + ";\n" +
-                        "\n" +
-                        "        # Specify the document root where index files are located\n" +
-                        "        root " + ServerPath + newDocumentRoot + ";\n" +  // Replace the document root
-                        "\n" +
-                        "        # List of index files that Nginx will try to serve if a directory is requested\n" +
-                        "        index index.php index.html index.htm;\n" +
-                        "\n" +
-                        "        location / {\n" +
-                        "            try_files $uri $uri/ =404;\n" +
-                        "        }\n" +
-                        "\n" +
-                        "        # Pass PHP requests to PHP-FPM for processing\n" +
-                        "        location ~ \\.php$ {\n" +
-                        "            root " + ServerPath + newDocumentRoot + ";  # Same document root as above\n" +  // Replace the document root
-                        "            fastcgi_pass 127.0.0.1:" + newPhpFpmPort + ";\n" +  // Replace the PHP-FPM port
-                        "            fastcgi_index index.php;\n" +
-                        "            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n" +
-                        "            include fastcgi_params;\n" +
-                        "        }\n" +
-                        "    }\n" +
-                        "}\n";
-
+        if (main.getConfig().getBoolean("Settings.denyNginxConfigOverride")){
+            logger.info("DenyNginxConfigOverride enabled. No override.");
+        }
+        String newConfig = null;
+        if (main.getConfig().getBoolean("SSLSettings.EnableSSL")) {
+            newConfig =
+                    "#user  nobody;\n" +
+                            "#Enable denyNginxConfigOverride to be able to edit this file otherwise \n" +
+                            "#IT WILL BE OVERRIDDEN. \n" +
+                            "#\n" +
+                            generateNginxConfig(main.getConfig().getInt("Settings.maxThreads")) +
+                            "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log;\n" +
+                            "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  notice;\n" +
+                            "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  info;\n" +
+                            "pid       " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/nginx.pid;\n" +
+                            "\n" +
+                            "events {\n" +
+                            "    worker_connections  1024;\n" +
+                            "}\n" +
+                            "\n" +
+                            "http {\n" +
+                            "    server_tokens off;\n" +
+                            "    add_header Server \"" + main.getName() + " " + main.getDescription().getVersion() + "\" always;\n" +
+                            "    client_body_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/client_body_temp;\n" +
+                            "    proxy_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/proxy_temp;\n" +
+                            "    fastcgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/fastcgi_temp;\n" +
+                            "    uwsgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/uwsgi_temp;\n" +
+                            "    scgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/scgi_temp;\n" +
+                            "    include       mime.types;\n" +
+                            "    default_type  application/octet-stream;\n" +
+                            "\n" +
+                            "    # Enable logging\n" +
+                            "    access_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/access.log;\n" +
+                            "    access_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/access.log;\n" +
+                            "\n" +
+                            "    sendfile        on;\n" +
+                            "    keepalive_timeout  65;\n" +
+                            "\n" +
+                            "    # Server block for handling SSL requests\n" +
+                            "    server {\n" +
+                            "         listen 0.0.0.0:" + newListenPort + ";\n" + //non ssl port for php redirect to ssl port
+                            "         server_name " + sslDomain + ";\n" +
+                            "         return 301 https://$host:" + sslPort + "$request_uri;\n" +
+                            "    }\n" +
+                            "    server {\n" +
+                            "        server_tokens off;\n" +
+                            "        add_header Server \"" + main.getName() + " " + main.getDescription().getVersion() + "\" always;\n" +
+                            "        listen 0.0.0.0:" + sslPort + "  ssl ;\n" +  // Replace the listen port remember http2
+                            "        server_name " + sslDomain + ";\n" +
+                            "        ssl_certificate " + ServerPath + main.getDataFolder() + "/ssl/" + sslPubl + ";\n" +
+                            "        ssl_certificate_key " + ServerPath + main.getDataFolder() + "/ssl/" + sslPriv + ";\n" +
+                            "        ssl_protocols TLSv1.2 TLSv1.3;\n" +
+                            "        ssl_ciphers HIGH:!aNULL:!MD5;\n" +
+                            "        ssl_prefer_server_ciphers on;\n" +
+                            "\n" +
+                            "        # Specify the document root where index files are located\n" +
+                            "        root " + ServerPath + newDocumentRoot + ";\n" +  // Replace the document root
+                            "\n" +
+                            "        # List of index files that Nginx will try to serve if a directory is requested\n" +
+                            "        index index.php index.html index.htm;\n" +
+                            "\n" +
+                            "        location / {\n" +
+                            "            try_files $uri $uri/ /index.php?route=$uri&$query_string;\n" +
+                            "        }\n" +
+                            "\n" +
+                            "        location ~ \\.(tpl|cache|htaccess)$ {\n" +
+                            "            return 403;\n" +
+                            "        }" +
+                            "\n" +
+                            "        # Pass PHP requests to PHP-FPM for processing\n" +
+                            "        location ~ \\.php$ {\n" +
+                            "            root " + ServerPath + newDocumentRoot + ";  # Same document root as above\n" +  // Replace the document root
+                            "            fastcgi_pass 127.0.0.1:" + newPhpFpmPort + ";\n" +  // Replace the PHP-FPM port
+                            "            fastcgi_index index.php;\n" +
+                            "            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n" +
+                            "            include fastcgi_params;\n" +
+                            "        }\n" +
+                            "    }\n" +
+                            "}\n";
+        }else {
+            newConfig =
+                    "#user  nobody;\n" +
+                            "#Enable denyNginxConfigOverride to be able to edit this file otherwise \n" +
+                            "#IT WILL BE OVERRIDDEN. \n" +
+                            "#\n" +
+                            "#Enable SSL for ssl configuration. \n" +
+                            generateNginxConfig(main.getConfig().getInt("Settings.maxThreads")) +
+                            "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log;\n" +
+                            "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  notice;\n" +
+                            "error_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/error.log  info;\n" +
+                            "pid       " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/nginx.pid;\n" +
+                            "\n" +
+                            "events {\n" +
+                            "    worker_connections  1024;\n" +
+                            "}\n" +
+                            "\n" +
+                            "http {\n" +
+                            "    server_tokens off;\n" +
+                            "    add_header Server \"" + main.getName() + " " + main.getDescription().getVersion() + "\" always;\n" +
+                            "    client_body_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/client_body_temp;\n" +
+                            "    proxy_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/proxy_temp;\n" +
+                            "    fastcgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/fastcgi_temp;\n" +
+                            "    uwsgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/uwsgi_temp;\n" +
+                            "    scgi_temp_path " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/scgi_temp;\n" +
+                            "    include       mime.types;\n" +
+                            "    default_type  application/octet-stream;\n" +
+                            "\n" +
+                            "    # Enable logging\n" +
+                            "    access_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/access.log;\n" +
+                            "    access_log " + ServerPath + main.getDataFolder() + "/nginxlinux/bin/nginx/logs/access.log;\n" +
+                            "\n" +
+                            "    sendfile        on;\n" +
+                            "    keepalive_timeout  65;\n" +
+                            "\n" +
+                            "    # Server block for handling requests\n" +
+                            "    server {\n" +
+                            "        server_tokens off;\n" +
+                            "        add_header Server \"" + main.getName() + " " + main.getDescription().getVersion() + "\" always;\n" +
+                            "        listen 0.0.0.0:" + newListenPort + ";\n" +  // Replace the listen port
+                            "        server_name " + ServerIP + ";\n" +
+                            "\n" +
+                            "        # Specify the document root where index files are located\n" +
+                            "        root " + ServerPath + newDocumentRoot + ";\n" +  // Replace the document root
+                            "\n" +
+                            "        # List of index files that Nginx will try to serve if a directory is requested\n" +
+                            "        index index.php index.html index.htm;\n" +
+                            "\n" +
+                            "        location / {\n" +
+                            "            try_files $uri $uri/ /index.php?route=$uri&$query_string;\n" +
+                            "        }\n" +
+                            "\n" +
+                            "        location ~ \\.(tpl|cache|htaccess)$ {\n" +
+                            "            return 403;\n" +
+                            "        }" +
+                            "\n" +
+                            "        # Pass PHP requests to PHP-FPM for processing\n" +
+                            "        location ~ \\.php$ {\n" +
+                            "            root " + ServerPath + newDocumentRoot + ";  # Same document root as above\n" +  // Replace the document root
+                            "            fastcgi_pass 127.0.0.1:" + newPhpFpmPort + ";\n" +  // Replace the PHP-FPM port
+                            "            fastcgi_index index.php;\n" +
+                            "            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\n" +
+                            "            include fastcgi_params;\n" +
+                            "        }\n" +
+                            "    }\n" +
+                            "}\n";
+        }
         // Write the new configuration to the file
         Files.write(configFile.toPath(), newConfig.getBytes());
     }
@@ -366,5 +457,26 @@ public class PHPWebServer{
                 p.destroy();
             }
         }
+    }
+    public static String generateNginxConfig(int workerProcesses) {
+        if (workerProcesses < 1 || workerProcesses > 64) {
+            throw new IllegalArgumentException("Worker processes must be between 1 and 64.");
+        }
+
+        // Generate bitmasks for each worker process
+        StringBuilder bitmasks = new StringBuilder();
+        for (int i = 0; i < workerProcesses; i++) {
+            String bitmask = String.format("%64s", Integer.toBinaryString(1 << i))
+                    .replace(' ', '0'); // Format as 64-bit binary string
+            bitmasks.append(bitmask).append(" ");
+        }
+
+        // Build the Nginx configuration
+        String nginxConfig = """
+                worker_processes %d; \n
+                worker_cpu_affinity %s; \n
+                """.formatted(workerProcesses, bitmasks.toString().trim());
+
+        return nginxConfig;
     }
 }

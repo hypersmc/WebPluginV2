@@ -22,6 +22,9 @@ Settings:
   ServerIP: localhost
   ServerIPComment: Used for both PHP and HTML in the command /webp (only spigot/bukkit and such NOT Proxy) WebPlugin binds webservers to the 0.0.0.0 (servers ip)
 
+  maxThreads: 2
+  maxThreads_Comment:
+
   debug: false
   debugcomment: Only enable if I need debug logs or if you can figure out debug info yourself. This will NOT make a debug.log file it will post in console.
 
@@ -35,17 +38,25 @@ Settings:
   EnableHTML: true
   HTMLComment: If you have PHP enabled you don't need html enabled as PHP can also handle HTML code.
 
+  PHPFolderPermissionFix: false
+  PHPFolderPermissionFixcomment: this triggers a quick 'sudo chown -R www-data' for the php folder. enable it to fix permission
+
   Autokey: false
-  AutoKeyComment: Don't enable as it's still WIP.
-SSLSettings: #PEM Key required!
+  AutoKeyComment: Won't work for now.
+
+  denyNginxConfigOverride: false
+  denyNginxConfigOverride_Comment:
+SSLSettings: #PEM Key required! (like let's encrypt)
   EnableSSL: false
   SSLPort: 25570
   SSLDomain: domain.com
   SSLPriv: private-key.pem
   SSLPubl: public-key.pem
+
+
 Linuxphpsettings:
   Errorfolder: /errors/
 
 
 #DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 13
+ConfigVersion: 14

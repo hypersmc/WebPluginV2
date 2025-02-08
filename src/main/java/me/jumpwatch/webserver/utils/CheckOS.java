@@ -28,9 +28,18 @@ public class CheckOS {
                 || OS.indexOf("aix") > 0);
     }
     public static Boolean isRunningInsideDocker() {
-        try (Stream< String > stream =
-                     Files.lines(Paths.get("/proc/1/cgroup"))) {
-            return stream.anyMatch(line -> line.contains("/docker"));
+        // Check for /.dockerenv file (commonly present in Docker containers)
+        if (Files.exists(Paths.get("/.dockerenv"))) {
+            return true;
+        }
+
+        // Check for patterns in /proc/1/cgroup
+        try (Stream<String> stream = Files.lines(Paths.get("/proc/1/cgroup"))) {
+            return stream.anyMatch(line ->
+                    line.contains("/docker/") ||
+                            line.contains("/kubepods/") ||
+                            line.contains("/containerd/")
+            );
         } catch (IOException e) {
             return false;
         }

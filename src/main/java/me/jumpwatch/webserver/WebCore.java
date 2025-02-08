@@ -26,10 +26,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.FileUtil;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.logging.Logger;
@@ -45,9 +42,10 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 12;
+    private int version = 14;
     private CommandManager commandManager;
     public ContentTypeResolver resolver;
+    final util util = new util();
 
     private synchronized boolean getAcceptorRunning() {
         return acceptorRunning;
@@ -100,6 +98,9 @@ public class WebCore extends JavaPlugin {
         }
         commandManager = new CommandManager(this, "WebP");
         registerCommand();
+        if (getConfig().getBoolean("Settings.PHPFolderPermissionFix")){
+            dofolderfix();
+        }
         if (!(new File(getDataFolder() + "/html/").exists())) {
             sethtmlfiles();
         }
@@ -170,8 +171,59 @@ public class WebCore extends JavaPlugin {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
             }
         }
+        getServer().getConsoleSender().sendMessage(
+                "\n \n" + ChatColor.DARK_GRAY + "[]=====["
+                        + ChatColor.GRAY +"Enabling "+ getDescription().getName()  + ChatColor.RESET
+                        + ChatColor.DARK_GRAY + "]=====[]" + ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY + "| " + ChatColor.RESET
+                        + ChatColor.RED + "Logged info:"  + ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
+                        + ChatColor.RED +"Name: " + ChatColor.RESET
+                        + ChatColor.GRAY + getDescription().getName()  + ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
+                        + ChatColor.RED +"Developer: " + ChatColor.RESET
+                        + ChatColor.GRAY + getDescription().getAuthors().toString().replace("[", "").replace("]", "") + ChatColor.RESET +"\n"
+                        + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
+                        + ChatColor.RED +"Version: " + ChatColor.RESET
+                        + ChatColor.GRAY +"v" + getDescription().getVersion() + ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
+                        + ChatColor.RED +"Soft Dependencies: " + ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY +"|      " + ChatColor.GREEN +"We have are Soft Dependencies free!!"+ ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
+                        + ChatColor.RED +"Features enabled: " + ChatColor.RESET + "\n"
+                        + util.detectSettingWebsite(this)
+                        + ChatColor.DARK_GRAY + "[]=====["
+                        + ChatColor.GRAY +"Enabling "+ getDescription().getName()  + ChatColor.RESET
+                        + ChatColor.DARK_GRAY + "]=====[]" + ChatColor.RESET + "\n\n");
 
     }
+
+    private void dofolderfix() {
+        try {
+            Process userProcess = Runtime.getRuntime().exec("whoami");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(userProcess.getInputStream()));
+            String currentUser = reader.readLine(); // Get the output (username)
+            reader.close();
+            String command = "chown -R " + currentUser + ": /home/container/plugins/webplugin/php";
+            Process chownProcess = Runtime.getRuntime().exec(command);
+            chownProcess.waitFor(); // Wait for the process to complete
+
+            System.out.println("Command executed successfully for user " + currentUser);
+
+        } catch (IOException | InterruptedException e) {
+            try {
+                String command = "chown -R www-data: /home/container/plugins/webplugin/php";
+                Process chownProcess = Runtime.getRuntime().exec(command);
+                chownProcess.waitFor(); // Wait for the process to complete
+
+                System.out.println("Command executed successfully for www-data");
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+            e.printStackTrace();
+        }
+    }
+
     @Override
     public void onDisable() {
         if (!isFolia()) {
