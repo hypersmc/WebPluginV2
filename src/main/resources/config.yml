@@ -1,62 +1,63 @@
-#    $$\      $$\           $$\       $$$$$$$\  $$\                     $$\
-#    $$ | $\  $$ |          $$ |      $$  __$$\ $$ |                    \__|
-#    $$ |$$$\ $$ | $$$$$$\  $$$$$$$\  $$ |  $$ |$$ |$$\   $$\  $$$$$$\  $$\ $$$$$$$\
-#    $$ $$ $$\$$ |$$  __$$\ $$  __$$\ $$$$$$$  |$$ |$$ |  $$ |$$  __$$\ $$ |$$  __$$\
-#    $$$$  _$$$$ |$$$$$$$$ |$$ |  $$ |$$  ____/ $$ |$$ |  $$ |$$ /  $$ |$$ |$$ |  $$ |
-#    $$$  / \$$$ |$$   ____|$$ |  $$ |$$ |      $$ |$$ |  $$ |$$ |  $$ |$$ |$$ |  $$ |
-#    $$  /   \$$ |\$$$$$$$\ $$$$$$$  |$$ |      $$ |\$$$$$$  |\$$$$$$$ |$$ |$$ |  $$ |
-#    \__/     \__| \_______|\_______/ \__|      \__| \______/  \____$$ |\__|\__|  \__|
-#                                                             $$\   $$ |
-#                                                             \$$$$$$  |
-#                                                              \______/
-#Discord support: https://discord.gg/9HDFz9vyv4
+# ==============================
+# 🔧 WebPluginV2 Configuration
+# Author: JumpWatch
+# Discord support: https://discord.gg/9HDFz9vyv4
+# ==============================
+
 Settings:
+  # ── Web Server Ports ──
   HTMLPORT: 25567
   PHPPort: 25568
-  LocalFPM: 25569
-  LocalFPMComment: It's very important you have a FPM port if you decide to use php.
-  ServerLocation: /home/container/
-  ServerLocationComment: For most users on linux that are in a docker container don't change this. tho if you are NOT on a container please put the path to the server folder. Remember the / at the end
-  IndexLocation: ""
-  IndexComment: the default path is /webplugin/php/ so "" (yes blank) is in root folder of php. if yours is located in another place do "/path/to/index/folder"
-  ServerIP: localhost
-  ServerIPComment: Used for both PHP and HTML in the command /webp (only spigot/bukkit and such NOT Proxy) WebPlugin binds webservers to the 0.0.0.0 (servers ip)
+  LocalFPM: 25569         # Very important if you decide to use PHP.
 
+  # ── Server Settings ──
+  ServerLocation: /home/container/   # Include trailing slash.
+  IndexLocation: ""                  # Default: "" = /webplugin/php/
+  ServerIP: localhost                # Used for PHP and HTML via /webp command.
+
+  # ── Threading ──
   maxThreads: 2
-  maxThreads_Comment:
 
-  debug: false
-  debugcomment: Only enable if I need debug logs or if you can figure out debug info yourself. This will NOT make a debug.log file it will post in console.
+  # ── Debug Settings ──
+  debug: false                       # Shows debug log in /webplugin/logs/.
 
+  # ── PHP Settings ──
   EnablePHP: false
-  PHPComment: If you use linux a fair warning here! WebPlugin WILL download a file from its distro on github (see bellow) this file is a precompiled version of php 8.2 and nginx 1.27.1 for linux. If you don't agree with this download please don't enable!
-  GithubWebPluginPHPRepo: https://github.com/hypersmc/WebPluginV2Repo
-  GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.2-PRECOMPILED-NEW.tar.gz
-  GithubWebPluginNGINXRepoFilename: WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz
-  GithubWebPluginComment: If this file name doesn't match the one downloaded then I either forgot to update this or something happened on the repo. Report it to me on discord :)
-  Comment: I got a lot of libs in the repo too like GLIBC, LIBONIG and LIBZ all of these are needed for the system to work now.
-  EnableHTML: true
-  HTMLComment: If you have PHP enabled you don't need html enabled as PHP can also handle HTML code.
+  PHPFolderPermissionFix: false       # Runs `chown -R www-data`, auto disables after run.
+  # ── Dependencies Reminder ──
+  # IMPORTANT: If PHP is enabled, the plugin WILL automatically download
+  # critical system libraries (GLIBC, LIBONIG, LIBZ) from the GitHub repo.
+  # These libraries are essential for the system to work, and are required
+  # for PHP, NGINX (Which is also downloaded from the repo),
+  # and other components to function properly.
+  # Check further down for info.
 
-  PHPFolderPermissionFix: false
-  PHPFolderPermissionFixcomment: this triggers a quick 'sudo chown -R www-data' for the php folder. enable it to fix permission
+  # ── HTML Settings ──
+  EnableHTML: true                  # PHP can also serve HTML.
 
-  Autokey: false
-  AutoKeyComment: Won't work for now.
+  # ── Auto Key ──
+  Autokey: false                     # Not functional currently.
 
+  # ── NGINX Configuration ──
   denyNginxConfigOverride: false
-  denyNginxConfigOverride_Comment:
-SSLSettings: #PEM Key required! (like let's encrypt)
+
+# ── SSL Configuration ──
+SSLSettings:
   EnableSSL: false
   SSLPort: 25570
-  SSLDomain: domain.com
-  SSLPriv: private-key.pem
-  SSLPubl: public-key.pem
+  SSLDomain: play.domain.com
+  SSLPriv: priv-key.pem
+  SSLPubl: pub-key.pem
 
-
+# ── Linux PHP Runtime Settings ──
 Linuxphpsettings:
-  Errorfolder: /errors/
+  Errorfolder: /errors/            #UNUSED
 
 
-#DO NOT IN ANY WAY EDIT THIS
-ConfigVersion: 14
+# ── GitHub Repo Resources ──
+GithubWebPluginPHPRepo: https://github.com/hypersmc/WebPluginV2Repo
+GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.3-PRECOMPILED.tar.gz
+GithubWebPluginNGINXRepoFilename: WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz
+
+# ── Internal ──
+ConfigVersion: 15                  # DO NOT EDIT

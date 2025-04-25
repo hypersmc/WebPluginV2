@@ -42,7 +42,7 @@ public class WebCoreProxy extends Plugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 14;
+    private int version = 15;
     public ContentTypeResolver resolver;
     private Logger logger = Logger.getLogger("WebPluginProxyBun");
     public static File dataFolder;

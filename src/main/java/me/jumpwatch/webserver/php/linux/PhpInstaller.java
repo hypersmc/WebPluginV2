@@ -2,6 +2,8 @@ package me.jumpwatch.webserver.php.linux;
 
 
 import me.jumpwatch.webserver.WebCore;
+import me.jumpwatch.webserver.utils.DebugLogger;
+import me.jumpwatch.webserver.utils.WPLogger;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.BufferedReader;
@@ -42,23 +44,22 @@ public class PhpInstaller {
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = stdInput.readLine()) != null) {
-                logger.info(line);
+                WPLogger.info(line);
                 output.append(line).append("\n");
             }
 
             // Read any errors
             while ((line = stdError.readLine()) != null) {
-                logger.warning(line);
+                WPLogger.warn(line);
                 output.append(line).append("\n");
             }
 
             int exitCode = p.waitFor();
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Process exited with code: " + exitCode);
             FilePermissions();
             installnginx();
         } catch (IOException | InterruptedException e) {
-//            logger.severe(e.getMessage());
-            e.printStackTrace();
+            DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -86,23 +87,22 @@ public class PhpInstaller {
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = stdInput.readLine()) != null) {
-                logger.info(line);
+                WPLogger.info(line);
                 output.append(line).append("\n");
             }
 
             // Read any errors
             while ((line = stdError.readLine()) != null) {
-                logger.warning(line);
+                WPLogger.warn(line);
                 output.append(line).append("\n");
             }
 
             int exitCode = p.waitFor();
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Process exited with code: " + exitCode);
             FilePermissionsNGINX();
             installglibc();
         } catch (IOException | InterruptedException e) {
-//            logger.severe(e.getMessage());
-            e.printStackTrace();
+            DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -129,23 +129,22 @@ public class PhpInstaller {
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = stdInput.readLine()) != null) {
-                logger.info(line);
+                WPLogger.info(line);
                 output.append(line).append("\n");
             }
 
             // Read any errors
             while ((line = stdError.readLine()) != null) {
-                logger.warning(line);
+                WPLogger.warn(line);
                 output.append(line).append("\n");
             }
 
             int exitCode = p.waitFor();
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Process exited with code: " + exitCode);
             FilePermissionsLIBONIG();
             installlibz();
         } catch (IOException | InterruptedException e) {
-//            logger.severe(e.getMessage());
-            e.printStackTrace();
+            DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -172,22 +171,21 @@ public class PhpInstaller {
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = stdInput.readLine()) != null) {
-                logger.info(line);
+                WPLogger.info(line);
                 output.append(line).append("\n");
             }
 
             // Read any errors
             while ((line = stdError.readLine()) != null) {
-                logger.warning(line);
+                WPLogger.warn(line);
                 output.append(line).append("\n");
             }
 
             int exitCode = p.waitFor();
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Process exited with code: " + exitCode);
             FilePermissionsLIBZ();
         } catch (IOException | InterruptedException e) {
-//            logger.severe(e.getMessage());
-            e.printStackTrace();
+            DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -214,23 +212,22 @@ public class PhpInstaller {
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = stdInput.readLine()) != null) {
-                logger.info(line);
+                WPLogger.info(line);
                 output.append(line).append("\n");
             }
 
             // Read any errors
             while ((line = stdError.readLine()) != null) {
-                logger.warning(line);
+                WPLogger.warn(line);
                 output.append(line).append("\n");
             }
 
             int exitCode = p.waitFor();
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Process exited with code: " + exitCode);
             FilePermissionsGLIBC();
             installlibonig();
         } catch (IOException | InterruptedException e) {
-//            logger.severe(e.getMessage());
-            e.printStackTrace();
+            DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -244,11 +241,12 @@ public class PhpInstaller {
             php.setExecutable(true, false);
             php.setReadable(true, false);
             php.setWritable(true, false);
-            logger.info("File permission check success!");
+            WPLogger.info("File permission check success!");
             FolderPermissions();
         } catch (Exception e) {
-            logger.severe("Failed to check file permission. Please enable debug mode.");
 
+            DebugLogger.error(e.getMessage());
+            
         }
     }
     public static void FilePermissionsLIBZ(){
@@ -257,10 +255,10 @@ public class PhpInstaller {
             php.setExecutable(true, false);
             php.setReadable(true, false);
             php.setWritable(true, false);
-            logger.info("File permission check success!");
+            WPLogger.info("File permission check success!");
             FolderPermissions();
         } catch (Exception e) {
-            logger.severe("Failed to check file permission. Please enable debug mode.");
+            DebugLogger.error(e.getMessage());
 
         }
     }
@@ -270,10 +268,10 @@ public class PhpInstaller {
             php.setExecutable(true, false);
             php.setReadable(true, false);
             php.setWritable(true, false);
-            logger.info("File permission check success!");
+            WPLogger.info("File permission check success!");
             FolderPermissions();
         } catch (Exception e) {
-            logger.severe("Failed to check file permission. Please enable debug mode.");
+            DebugLogger.error(e.getMessage());
 
         }
     }
@@ -283,9 +281,9 @@ public class PhpInstaller {
             php.setExecutable(true, false);
             php.setReadable(true, false);
             php.setWritable(true, false);
-            logger.info("File permission check success!");
+            WPLogger.info("File permission check success!");
         } catch (Exception e) {
-            logger.severe("Failed to check file permission. Please enable debug mode.");
+            DebugLogger.error(e.getMessage());
 
         }
     }
@@ -295,10 +293,10 @@ public class PhpInstaller {
             php.setExecutable(true, false);
             php.setReadable(true, false);
             php.setWritable(true, false);
-            logger.info("File permission check success!");
+            WPLogger.info("File permission check success!");
             FilePermissionsfpm();
         } catch (Exception e) {
-            logger.severe("Failed to check file permission. Please enable debug mode.");
+            DebugLogger.error(e.getMessage());
 
         }
     }
@@ -308,10 +306,10 @@ public class PhpInstaller {
             php.setExecutable(true, false);
             php.setReadable(true, false);
             php.setWritable(true, false);
-            logger.info("File permission check success!");
+            WPLogger.info("File permission check success!");
             FolderPermissions();
         } catch (Exception e) {
-            logger.severe("Failed to check file permission. Please enable debug mode.");
+            DebugLogger.error(e.getMessage());
 
         }
     }
@@ -335,9 +333,9 @@ public class PhpInstaller {
 
                 System.out.println("Command executed successfully");
             } catch (Exception ex) {
-                throw new RuntimeException(ex);
+                DebugLogger.error(ex.getMessage());
             }
-            e.printStackTrace();
+            DebugLogger.error(e.getMessage());
         }
     }
 }

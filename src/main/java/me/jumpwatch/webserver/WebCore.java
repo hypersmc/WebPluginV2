@@ -42,7 +42,7 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 14;
+    private int version = 15;
     private CommandManager commandManager;
     public ContentTypeResolver resolver;
     final util util = new util();
@@ -100,6 +100,7 @@ public class WebCore extends JavaPlugin {
         registerCommand();
         if (getConfig().getBoolean("Settings.PHPFolderPermissionFix")){
             dofolderfix();
+            getConfig().set("Settings.PHPFolderPermissionFix", false);
         }
         if (!(new File(getDataFolder() + "/html/").exists())) {
             sethtmlfiles();
@@ -129,13 +130,7 @@ public class WebCore extends JavaPlugin {
             if (new File("plugins/WebPlugin/phpwindows").exists() && new File("plugins/WebPlugin/phpwindows/php").exists() && new File("plugins/WebPlugin/phpwindows/nginx").exists()) {
                 logger.info("Core Windows PHP files exist!");
             } else {
-                logger.info("Starting to download Files for Nginx and PHP for Windows");
-                try {
-                    WinInstaller.WindowsPHPNginxInstaller();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-
+                logger.info("Windows php feature have been disabled until it is fixed!");
             }
         }
         if (getConfig().isSet("Settings.HTMLPORT")) {
@@ -162,7 +157,7 @@ public class WebCore extends JavaPlugin {
         }
         if (CheckOS.isWindows()) {
             Startwebserverhtml();
-            Startwebserverphp();
+            logger.info("Windows php feature have been disabled until it is fixed!");
         }
         if (CheckOS.isUnix()) {
             Startwebserverhtml();
@@ -185,10 +180,10 @@ public class WebCore extends JavaPlugin {
                         + ChatColor.GRAY + getDescription().getAuthors().toString().replace("[", "").replace("]", "") + ChatColor.RESET +"\n"
                         + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
                         + ChatColor.RED +"Version: " + ChatColor.RESET
-                        + ChatColor.GRAY +"v" + getDescription().getVersion() + ChatColor.RESET + "\n"
+                        + ChatColor.GRAY +"v-" + getDescription().getVersion() + ChatColor.RESET + "\n"
                         + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
                         + ChatColor.RED +"Soft Dependencies: " + ChatColor.RESET + "\n"
-                        + ChatColor.DARK_GRAY +"|      " + ChatColor.GREEN +"We have are Soft Dependencies free!!"+ ChatColor.RESET + "\n"
+                        + ChatColor.DARK_GRAY +"|      " + ChatColor.GREEN +"We are Soft Dependencies free!!"+ ChatColor.RESET + "\n"
                         + ChatColor.DARK_GRAY +"|   " + ChatColor.RESET
                         + ChatColor.RED +"Features enabled: " + ChatColor.RESET + "\n"
                         + util.detectSettingWebsite(this)
@@ -208,7 +203,7 @@ public class WebCore extends JavaPlugin {
             Process chownProcess = Runtime.getRuntime().exec(command);
             chownProcess.waitFor(); // Wait for the process to complete
 
-            System.out.println("Command executed successfully for user " + currentUser);
+            WPLogger.info("Command executed successfully for user " + currentUser);
 
         } catch (IOException | InterruptedException e) {
             try {
@@ -216,11 +211,11 @@ public class WebCore extends JavaPlugin {
                 Process chownProcess = Runtime.getRuntime().exec(command);
                 chownProcess.waitFor(); // Wait for the process to complete
 
-                System.out.println("Command executed successfully for www-data");
+                WPLogger.info("Command executed successfully for www-data");
             } catch (Exception ex) {
-                throw new RuntimeException(ex);
+                if (debug) DebugLogger.error(ex.getMessage());
             }
-            e.printStackTrace();
+            if (debug) DebugLogger.error(e.getMessage());
         }
     }
 
@@ -325,6 +320,7 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " /webp startweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp webreload | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp reset | (ONLY works in console!)");
+                sender.sendMessage(prefix + " /webp uploadlogs <debug:true|false> [includeConfig:true|false] [redactConfig:true|false] | Upload logs for debugging purposes");
             } else {
                 sender.sendMessage(prefix + " It appears you do not have the right permissions to do this!");
             }
@@ -416,6 +412,27 @@ public class WebCore extends JavaPlugin {
             if (params.length == 1) {
                 sender.sendMessage(prefix + " Starting config reset!");
                 resetconfig(((Player) sender).getPlayer());
+            }
+        }));
+
+        commandManager.register("uploadlogs", ((sender, params) -> {
+            if (sender.hasPermission("web.logsupload") || sender.hasPermission("web.*")) {
+                if (params.length >= 1) {
+                    boolean useDebug = Boolean.parseBoolean(params[0]);
+                    boolean includeConfig = params.length >= 2 && Boolean.parseBoolean(params[1]);
+                    boolean redactConfig = params.length >= 3 && Boolean.parseBoolean(params[2]);
+
+                    String url = LogUploader.uploadLatestLog(useDebug, includeConfig, redactConfig);
+                    if (url == null) {
+                        sender.sendMessage(prefix + ChatColor.RED + " [WARNING] No log files found!");
+                    } else {
+                        sender.sendMessage(prefix + " Uploaded log: " + url + "/raw");
+                    }
+                } else {
+                    sender.sendMessage(prefix + " /webp uploadlogs <debug:true|false> [includeConfig:true|false] [redactConfig:true|false]");
+                }
+            } else {
+                sender.sendMessage(prefix + " You do not have permission to do this!");
             }
         }));
 

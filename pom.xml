@@ -6,7 +6,7 @@
 
     <groupId>org.WebPlugin</groupId>
     <artifactId>WebPlugin</artifactId>
-    <version>devbuild</version>
+    <version>3.0R</version>
 
     <build>
         <defaultGoal>clean package</defaultGoal>
@@ -69,7 +69,7 @@
 
                         <configuration>
 
-                            <outputDirectory>C:\Users\jespe\Desktop\test server for webp\plugins</outputDirectory>
+                            <outputDirectory>/home/jumpwatch/Desktop/Webplugin/</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>${basedir}/target</directory>

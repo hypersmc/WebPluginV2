@@ -13,10 +13,10 @@ public class util {
 
 
     public String detectSettingWebsite(Plugin pl){
-        if(pl.getConfig().getBoolean("Settings.UseWebsiteFunction")){
-            return "" + ChatColor.DARK_GRAY +"|      " + ChatColor.GREEN +"Website Addon"+ ChatColor.RESET + "\n";
+        if(pl.getConfig().getBoolean("Settings.EnablePHP")){
+            return "" + ChatColor.DARK_GRAY +"|      " + ChatColor.GREEN +"PHP System"+ ChatColor.RESET + "\n";
         }else{
-            return "" + ChatColor.DARK_GRAY +"|      " + ChatColor.RED+"Website Addon"+ ChatColor.RESET + "\n";
+            return "" + ChatColor.DARK_GRAY +"|      " + ChatColor.RED+"PHP System"+ ChatColor.RESET + "\n";
         }
     }
     public String settingsPHPPort(Plugin pl){

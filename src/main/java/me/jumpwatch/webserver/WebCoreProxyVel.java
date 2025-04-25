@@ -46,7 +46,7 @@ public class WebCoreProxyVel  {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 14;
+    private int version = 15;
     public ContentTypeResolver resolver;
     private ScheduledTask scheduledTask;
     private ScheduledTask scheduledTaskSSL;

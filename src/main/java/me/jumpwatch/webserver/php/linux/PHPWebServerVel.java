@@ -1,6 +1,8 @@
 package me.jumpwatch.webserver.php.linux;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import me.jumpwatch.webserver.WebCoreProxyVel;
+import me.jumpwatch.webserver.utils.DebugLogger;
+import me.jumpwatch.webserver.utils.WPLogger;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -52,6 +54,7 @@ public class PHPWebServerVel{
             updateCGIParms(path4, ServerSoftware);
             return true;
         } catch (Exception e) {
+            if ((boolean)WebCoreProxyVel.settings.get("Settings.debug")) DebugLogger.error(e.getMessage());
             return false;
         }
     }
@@ -242,12 +245,11 @@ public class PHPWebServerVel{
                 }
 
                 int exitCode = p.waitFor();
-                logger.info("Output: " + output.toString());
-                logger.info("Process exited with code: " + exitCode);
+                WPLogger.info("Exit code: " + exitCode);
+                WPLogger.info("Output: " + output.toString());
 
             } catch (IOException | InterruptedException e) {
-                logger.severe(e.getMessage());
-                e.printStackTrace();
+                if ((boolean)WebCoreProxyVel.settings.get("Settings.debug")) DebugLogger.error(e.getMessage());
             } finally {
                 if (p != null) {
                     p.destroy();
@@ -282,12 +284,11 @@ public class PHPWebServerVel{
                 }
 
                 int exitCode = p.waitFor();
-                logger.info("Output: " + output.toString());
-                logger.info("Process exited with code: " + exitCode);
+                WPLogger.info("Exit code: " + exitCode);
+                WPLogger.info("Output: " + output.toString());
 
             } catch (IOException | InterruptedException e) {
-                logger.severe(e.getMessage());
-                e.printStackTrace();
+                if ((boolean)WebCoreProxyVel.settings.get("Settings.debug")) DebugLogger.error(e.getMessage());
             } finally {
                 if (p != null) {
                     p.destroy();

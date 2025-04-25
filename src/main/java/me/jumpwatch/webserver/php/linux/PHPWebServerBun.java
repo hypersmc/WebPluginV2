@@ -1,6 +1,8 @@
 package me.jumpwatch.webserver.php.linux;
 
 import me.jumpwatch.webserver.WebCoreProxy;
+import me.jumpwatch.webserver.utils.DebugLogger;
+import me.jumpwatch.webserver.utils.WPLogger;
 import net.md_5.bungee.api.ProxyServer;
 
 import java.io.*;
@@ -48,6 +50,7 @@ public class PHPWebServerBun{
             updateCGIParms(path4, ServerSoftware);
             return true;
         } catch (Exception e) {
+            if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             return false;
         }
     }
@@ -248,12 +251,11 @@ public class PHPWebServerBun{
                 }
 
                 int exitCode = p.waitFor();
-                logger.info("Output: " + output.toString());
-                logger.info("Process exited with code: " + exitCode);
+                WPLogger.info("Exit code: " + exitCode);
+                WPLogger.info("Output: " + output.toString());
 
             } catch (IOException | InterruptedException e) {
-                logger.severe(e.getMessage());
-                e.printStackTrace();
+                if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             } finally {
                 if (p != null) {
                     p.destroy();
@@ -288,12 +290,11 @@ public class PHPWebServerBun{
                 }
 
                 int exitCode = p.waitFor();
-                logger.info("Output: " + output.toString());
-                logger.info("Process exited with code: " + exitCode);
+                WPLogger.info("Exit code: " + exitCode);
+                WPLogger.info("Output: " + output.toString());
 
             } catch (IOException | InterruptedException e) {
-                logger.severe(e.getMessage());
-                e.printStackTrace();
+                if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             } finally {
                 if (p != null) {
                     p.destroy();

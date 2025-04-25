@@ -1,6 +1,8 @@
 package me.jumpwatch.webserver.php.linux;
 
 import me.jumpwatch.webserver.WebCore;
+import me.jumpwatch.webserver.utils.DebugLogger;
+import me.jumpwatch.webserver.utils.WPLogger;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.BufferedReader;
@@ -56,6 +58,7 @@ public class PHPWebServer{
             fixlibrary();
             return true;
         } catch (Exception e) {
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             return false;
         }
     }
@@ -334,7 +337,7 @@ public class PHPWebServer{
             }.runTaskAsynchronously(main);
         }
     }
-    public static void fixlibrary() {
+    public void fixlibrary() {
         String[] cmd = {
                 "/bin/sh", "-c",
                 "export LD_LIBRARY_PATH=/home/container/plugins/webplugin/phplinux/bin/php8/lib:$LD_LIBRARY_PATH\n"
@@ -350,21 +353,20 @@ public class PHPWebServer{
             StringBuilder output = new StringBuilder();
             String line;
             while ((line = stdInput.readLine()) != null) {
-                logger.info(line);
+                WPLogger.info(line);
                 output.append(line).append("\n");
             }
 
             // Read any errors
             while ((line = stdError.readLine()) != null) {
-                logger.warning(line);
+                WPLogger.warn(line);
                 output.append(line).append("\n");
             }
 
             int exitCode = p.waitFor();
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Exit code: " + exitCode);
         } catch (IOException | InterruptedException e) {
-//            logger.severe(e.getMessage());
-            e.printStackTrace();
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -377,6 +379,7 @@ public class PHPWebServer{
             Class.forName("io.papermc.paper.threadedregions.scheduler.RegionScheduler");
             return true;
         } catch (ClassNotFoundException e) {
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             return false; // Not running on Folia
         }
     }
@@ -407,12 +410,12 @@ public class PHPWebServer{
             }
 
             int exitCode = p.waitFor();
-            logger.info("Output: " + output.toString());
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Exit code: " + exitCode);
+            WPLogger.info("Output: " + output.toString());
+
 
         } catch (IOException | InterruptedException e) {
-            logger.severe(e.getMessage());
-            e.printStackTrace();
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -424,7 +427,7 @@ public class PHPWebServer{
         String[] cmd = {
                 "/bin/sh", "-c",
                 "cd ~/plugins/webplugin/nginxlinux/bin/nginx/sbin/ \n" +
-                        "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf"
+                        "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf -p ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/"
         };
         Process p = null;
         try {
@@ -446,12 +449,11 @@ public class PHPWebServer{
             }
 
             int exitCode = p.waitFor();
-            logger.info("Output: " + output.toString());
-            logger.info("Process exited with code: " + exitCode);
+            WPLogger.info("Exit code: " + exitCode);
+            WPLogger.info("Output: " + output.toString());
 
         } catch (IOException | InterruptedException e) {
-            logger.severe(e.getMessage());
-            e.printStackTrace();
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
         } finally {
             if (p != null) {
                 p.destroy();
@@ -459,8 +461,8 @@ public class PHPWebServer{
         }
     }
     public static String generateNginxConfig(int workerProcesses) {
-        if (workerProcesses < 1 || workerProcesses > 64) {
-            throw new IllegalArgumentException("Worker processes must be between 1 and 64.");
+        if (workerProcesses < 1 || workerProcesses > 256) {
+            throw new IllegalArgumentException("Worker processes must be between 1 and 256.");
         }
 
         // Generate bitmasks for each worker process
