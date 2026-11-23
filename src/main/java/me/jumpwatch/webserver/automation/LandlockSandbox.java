@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -53,7 +52,10 @@ public final class LandlockSandbox {
                                   Path pluginData, Path websiteRoot, Path phpRuntime, Path nginxRuntime) throws IOException {
         if (!enabled) return original;
         if (availability != Availability.AVAILABLE) {
-            if (mode == Mode.REQUIRED) throw new IOException("Landlock is required but unavailable: " + availability + " (" + probeDetail + ")");
+            // A malformed/crashing helper is not a predictable platform limitation.
+            // Do not accidentally downgrade an enabled sandbox after an unexpected probe failure.
+            if (mode == Mode.REQUIRED || availability == Availability.ERROR)
+                throw new IOException("Landlock cannot be enforced: " + availability + " (" + probeDetail + ")");
             return original;
         }
         List<String> command = new ArrayList<>();
@@ -66,15 +68,18 @@ public final class LandlockSandbox {
                 "/etc/localtime", "/dev/urandom", "/dev/null", "/proc/self"}) addIfExists(ro, Path.of(path));
         addIfExists(rx, phpRuntime);
         addIfExists(rx, nginxRuntime);
-        addIfExists(rw, pluginData);
-        addIfExists(rw, websiteRoot);
+        // Read plugin-managed web configuration and certificates, but do not grant
+        // write permission to the entire plugin tree (which includes task state and config).
+        addIfExists(ro, pluginData);
         addIfExists(rw, Path.of(System.getProperty("java.io.tmpdir", "/tmp")));
-
-        // Keep compatibility broad INSIDE the website, but not across the Minecraft filesystem.
-        // For NGINX we can narrow the site root to read-only; log/temp paths stay writable.
-        if (role == Role.NGINX && websiteRoot != null) {
-            rw.remove(websiteRoot.toAbsolutePath().normalize());
+        if (role == Role.NGINX) {
             addIfExists(ro, websiteRoot);
+            // Compatibility profile: NGINX keeps its own logs, PID and temp files in this root.
+            addIfExists(rw, nginxRuntime);
+        } else {
+            // PHP-FPM and Laravel CLI need normal write access inside the site directory.
+            addIfExists(rw, websiteRoot);
+            if (role == Role.PHP_FPM) addIfExists(rw, phpRuntime);
         }
         for (Path p : rx) { command.add("--rx"); command.add(p.toString()); }
         for (Path p : ro) { command.add("--ro"); command.add(p.toString()); }
