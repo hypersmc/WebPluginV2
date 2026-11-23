@@ -353,6 +353,8 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " /webp dev | gets who developed this plugin and plugin version");
                 sender.sendMessage(prefix + " /webp ver | gets plugin version and checks if there is a new version");
                 sender.sendMessage(prefix + " /webp help | to get this again.");
+                sender.sendMessage(prefix + " /webp tasks list|status|start|stop|logs | Manage configured PHP workers.");
+                sender.sendMessage(prefix + " /webp sandbox | Show Landlock availability and protection status.");
                 sender.sendMessage(prefix + " /webp stopweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp startweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp webreload | (ONLY works if php is enabled!");
