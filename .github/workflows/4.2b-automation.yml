@@ -67,12 +67,11 @@ jobs:
             10|11|12) echo "Landlock unavailable on runner ($rc); sandbox enforcement test skipped";;
             *) echo "Landlock probe unexpectedly failed with $rc"; exit 1;;
           esac
-      - name: Publish Linux x86-64 beta test binaries
+      - name: Publish self-contained Linux x86-64 beta JAR
         uses: actions/upload-artifact@v4
         with:
           name: WebPlugin-4.2B-linux-amd64
-          path: |
-            target/WebPlugin-4.2B.jar
-            target/webplugin-landlock
+          # The native helper lives inside the JAR and is extracted at startup.
+          path: target/WebPlugin-4.2B.jar
           if-no-files-found: error
           retention-days: 14
