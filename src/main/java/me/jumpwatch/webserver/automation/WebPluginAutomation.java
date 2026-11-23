@@ -37,10 +37,8 @@ public final class WebPluginAutomation implements AutoCloseable {
         String suffix = indexLocation == null ? "" : indexLocation;
         // Match WebPlugin 4.1R's configured NGINX webroot convention exactly.
         this.websiteRoot = Path.of(dataRoot.toString() + "/php" + suffix).toAbsolutePath().normalize();
-        Path helper = helperLocation == null || helperLocation.isBlank()
-                ? dataRoot.resolve("bin").resolve("webplugin-landlock")
-                : Path.of(helperLocation);
-        if (!helper.isAbsolute()) helper = paths.serverRoot().resolve(helper);
+        Path helper = LandlockHelperInstaller.prepare(
+                dataRoot, paths.serverRoot(), helperLocation, log);
         LandlockSandbox.Mode mode;
         try {
             mode = LandlockSandbox.Mode.valueOf(
