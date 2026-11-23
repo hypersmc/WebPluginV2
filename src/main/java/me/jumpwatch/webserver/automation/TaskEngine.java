@@ -64,8 +64,12 @@ public final class TaskEngine implements AutoCloseable {
 
     public synchronized void autoStart() {
         for (TaskDefinition task : definitions.values()) {
-            if (task.kind == ProcessSupervisor.Kind.SERVICE && task.autoStart) start(task.id);
-            else if (task.kind == ProcessSupervisor.Kind.ONESHOT && ledger.shouldRun(task)) start(task.id);
+            try {
+                if (task.kind == ProcessSupervisor.Kind.SERVICE && task.autoStart) start(task.id);
+                else if (task.kind == ProcessSupervisor.Kind.ONESHOT && ledger.shouldRun(task)) start(task.id);
+            } catch (RuntimeException ex) {
+                log.accept("Task " + task.id + " did not auto-start: " + ex.getMessage());
+            }
         }
     }
 
@@ -74,6 +78,7 @@ public final class TaskEngine implements AutoCloseable {
         if (closed.get()) throw new IllegalStateException("Task engine is closed");
         TaskDefinition task = definitions.get(id);
         if (task == null) throw new IllegalArgumentException("Unknown task Id: " + id);
+        recordedExits.remove(id);
         ProcessSupervisor.Spec spec = new ProcessSupervisor.Spec(task.id, task.kind, task.restart,
                 task.instances, task.timeoutSeconds, task.successCodes, () -> {
                     ProcessBuilder original = phpCliBuilder.build(task.workingDirectory, task.arguments);
@@ -113,11 +118,12 @@ public final class TaskEngine implements AutoCloseable {
         }
     }
 
-    @Override public void close() {
-        if (!closed.compareAndSet(false, true)) return;
+    @Override public synchronized void close() {
+        if (closed.get()) return;
+        // Persist successes that finished just before shutdown. In-progress work is not complete.
+        reconcile();
+        closed.set(true);
         reconciliation.shutdownNow();
-        // Completion is normally persisted within 400 ms; one last synchronous pass
-        // is intentionally omitted here because in-progress tasks must not be marked done.
         supervisor.close();
     }
 }
