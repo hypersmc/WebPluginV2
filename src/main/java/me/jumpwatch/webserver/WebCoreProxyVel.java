@@ -9,6 +9,7 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import me.jumpwatch.webserver.html.NoneSSLHtmlProxyVel;
 import me.jumpwatch.webserver.php.linux.PhpInstaller;
+import me.jumpwatch.webserver.automation.WebPluginAutomation;
 import me.jumpwatch.webserver.php.linux.PHPWebServerVel;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.ContentTypeResolver;
@@ -33,11 +34,12 @@ import java.util.logging.Logger;
  * @Project WebPluginV2
  * v1.0.0
  */
-@Plugin(id= "webplugin", name = "webplugin", version = "4.0R", authors = "JumpWatch, HypersMC, HumpJump")
+@Plugin(id= "webplugin", name = "webplugin", version = "4.2B", authors = "JumpWatch, HypersMC, HumpJump")
 public class WebCoreProxyVel  {
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(WebCoreProxyVel.class);
-    public String pluginversion = "4.0R";
+    public String pluginversion = "4.2B";
     public static String closeConnection = "!Close Connection!";
+    public WebPluginAutomation automation;
     private int listeningport;
     private int portphp;
     private WebCoreProxyVel m = this;
@@ -80,6 +82,7 @@ public class WebCoreProxyVel  {
     @Subscribe
     public void onProxyShutdown(ProxyShutdownEvent event) {
         logger.info("WebCoreProxyVel is shutting down.");
+        if (automation != null) { automation.close(); automation = null; }
         boolean enableSSL = (Boolean) sslSettings.get("EnableSSL");
         boolean enableHTML = (Boolean) settings.get("EnableHTML");
         boolean enablePHP = (Boolean) settings.get("EnablePHP");
@@ -167,12 +170,16 @@ public class WebCoreProxyVel  {
             }
         }
         }
+        boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()){
             Startwebserverhtml();
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
-            StartwebserverphpLinux();
+            if (automationReady) {
+                StartwebserverphpLinux();
+                if (automation != null && asBoolean(settings.get("EnablePHP"), false)) automation.startTasksIfReady();
+            }
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
                 logger.info("It's recommended to run minecraft servers in docker containers.");
@@ -293,6 +300,42 @@ public class WebCoreProxyVel  {
             logger.severe("Failed to save resource " + resourcePath);
         }
     }
+    private Object automationSetting(String path, Object fallback) {
+        Object value = config;
+        for (String part : path.split("\\.")) {
+            if (!(value instanceof java.util.Map<?, ?>)) return fallback;
+            value = ((java.util.Map<?, ?>) value).get(part);
+        }
+        return value == null ? fallback : value;
+    }
+
+    private boolean initializeAutomation() {
+        if (!CheckOS.isUnix()) return true;
+        try {
+            Object raw = automationSetting("DeploymentTasks.Tasks", java.util.List.of());
+            java.util.List<java.util.Map<?, ?>> taskConfigs = new java.util.ArrayList<>();
+            if (raw instanceof java.util.List<?>) {
+                for (Object entry : (java.util.List<?>) raw)
+                    if (entry instanceof java.util.Map<?, ?>)
+                        taskConfigs.add((java.util.Map<?, ?>) entry);
+            }
+            Object cap = automationSetting("DeploymentTasks.MaxProcesses", 8);
+            automation = new WebPluginAutomation(
+                    new PHPWebServerVel(this).runtimeOptions(),
+                    asString(automationSetting("Settings.IndexLocation", "")),
+                    asBoolean(automationSetting("Security.Landlock.Enabled", false), false),
+                    asString(automationSetting("Security.Landlock.Mode", "preferred")),
+                    asString(automationSetting("Security.Landlock.HelperPath", "")),
+                    asBoolean(automationSetting("DeploymentTasks.Enabled", false), false),
+                    cap instanceof Number ? ((Number) cap).intValue() : 8,
+                    taskConfigs, message -> logger.info("[Automation] " + message));
+            return true;
+        } catch (Exception ex) {
+            logger.severe("Automation startup failed; PHP will not launch without sandbox policy: " + ex.getMessage());
+            return false;
+        }
+    }
+
     private void StartwebserverphpLinux() {
         boolean enablePHP = (boolean) settings.get("EnablePHP");
         if (enablePHP) {

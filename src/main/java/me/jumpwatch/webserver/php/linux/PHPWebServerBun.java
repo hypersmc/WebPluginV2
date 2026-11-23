@@ -233,7 +233,7 @@ public class PHPWebServerBun{
     private void startphpfpm(){
         ProxyServer.getInstance().getScheduler().schedule(main, () -> {
             try {
-                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                LinuxPhpProcessRunner runner = (main.automation == null ? new LinuxPhpProcessRunner(runtimeOptions()) : main.automation.runtime());
                 runner.startPhpFpm();
             } catch (InterruptedException e) {
                 if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
@@ -246,7 +246,7 @@ public class PHPWebServerBun{
     private void startnginxfpm(){
         ProxyServer.getInstance().getScheduler().schedule(main, () -> {
             try {
-                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                LinuxPhpProcessRunner runner = (main.automation == null ? new LinuxPhpProcessRunner(runtimeOptions()) : main.automation.runtime());
                 runner.startNginx();
             } catch (InterruptedException e) {
                 if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
@@ -258,7 +258,7 @@ public class PHPWebServerBun{
 
     }
 
-    private LinuxPhpRuntimeOptions runtimeOptions() {
+    public LinuxPhpRuntimeOptions runtimeOptions() {
         return new LinuxPhpRuntimeOptions(
                 main.getDataFolder(),
                 main.configuration.getString("Settings.ServerLocation"),

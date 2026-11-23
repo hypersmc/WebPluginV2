@@ -227,7 +227,7 @@ public class PHPWebServerVel{
     private void startphpfpm(){
         php = main.proxyServer.getScheduler().buildTask(main, () -> {
             try {
-                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                LinuxPhpProcessRunner runner = (main.automation == null ? new LinuxPhpProcessRunner(runtimeOptions()) : main.automation.runtime());
                 runner.startPhpFpm();
             } catch (InterruptedException e) {
                 if (debugEnabled()) DebugLogger.error(e.getMessage());
@@ -240,7 +240,7 @@ public class PHPWebServerVel{
     private void startnginxfpm(){
         nginx = main.proxyServer.getScheduler().buildTask(main, () -> {
             try {
-                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                LinuxPhpProcessRunner runner = (main.automation == null ? new LinuxPhpProcessRunner(runtimeOptions()) : main.automation.runtime());
                 runner.startNginx();
             } catch (InterruptedException e) {
                 if (debugEnabled()) DebugLogger.error(e.getMessage());
@@ -252,7 +252,7 @@ public class PHPWebServerVel{
 
     }
 
-    private LinuxPhpRuntimeOptions runtimeOptions() {
+    public LinuxPhpRuntimeOptions runtimeOptions() {
         return new LinuxPhpRuntimeOptions(
                 main.getDataFolder(),
                 asString(WebCoreProxyVel.settings.get("ServerLocation")),
@@ -315,7 +315,7 @@ public class PHPWebServerVel{
     }
 
     public void stopsystem(){
-        php.cancel();
-        nginx.cancel();
+        if (php != null) php.cancel();
+        if (nginx != null) nginx.cancel();
     }
 }

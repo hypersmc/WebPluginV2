@@ -14,6 +14,7 @@ import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
 import me.jumpwatch.webserver.php.linux.PHPWebServer;
 import me.jumpwatch.webserver.php.linux.PhpInstaller;
+import me.jumpwatch.webserver.automation.WebPluginAutomation;
 import me.jumpwatch.webserver.utils.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -42,6 +43,7 @@ public class WebCore extends JavaPlugin {
     public static String ver;
     private int version = 18;
     private CommandManager commandManager;
+    public WebPluginAutomation automation;
     public ContentTypeResolver resolver;
     final util util = new util();
 
@@ -148,12 +150,16 @@ public class WebCore extends JavaPlugin {
             }
         }
         }
+        boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()) {
             Startwebserverhtml();
         }
         if (CheckOS.isUnix()) {
             Startwebserverhtml();
-            StartwebserverphpLinux();
+            if (automationReady) {
+                StartwebserverphpLinux();
+                if (automation != null && getConfig().getBoolean("Settings.EnablePHP")) automation.startTasksIfReady();
+            }
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
             }
@@ -213,6 +219,7 @@ public class WebCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (automation != null) { automation.close(); automation = null; }
         if (!isFolia()) {
             Bukkit.getScheduler().cancelTasks(m); //problem in folia
             Bukkit.getScheduler().cancelTasks(this); //problem in folia
@@ -230,6 +237,27 @@ public class WebCore extends JavaPlugin {
             }
         }
 
+    }
+
+    /** Initialize the optional security manager before any PHP/NGINX processes are launched. */
+    private boolean initializeAutomation() {
+        if (!CheckOS.isUnix()) return true;
+        try {
+            automation = new WebPluginAutomation(
+                    new PHPWebServer(this).runtimeOptions(),
+                    getConfig().getString("Settings.IndexLocation", ""),
+                    getConfig().getBoolean("Security.Landlock.Enabled", false),
+                    getConfig().getString("Security.Landlock.Mode", "preferred"),
+                    getConfig().getString("Security.Landlock.HelperPath", ""),
+                    getConfig().getBoolean("DeploymentTasks.Enabled", false),
+                    getConfig().getInt("DeploymentTasks.MaxProcesses", 8),
+                    getConfig().getMapList("DeploymentTasks.Tasks"),
+                    message -> getLogger().info("[Automation] " + message));
+            return true;
+        } catch (Exception ex) {
+            getLogger().severe("Automation startup failed; PHP will not launch without the configured sandbox policy: " + ex.getMessage());
+            return false;
+        }
     }
 
     private void StartwebserverphpLinux(){
@@ -294,6 +322,30 @@ public class WebCore extends JavaPlugin {
     }
 
     private void registerCommand(){
+        commandManager.register("tasks", ((sender, params) -> {
+            if (!sender.hasPermission("web.tasks") && !sender.hasPermission("web.*") && !sender.isOp()) {
+                sender.sendMessage(prefix + " You do not have permission to manage deployment tasks.");
+                return;
+            }
+            if (automation == null) {
+                sender.sendMessage(prefix + " Automation is not initialized.");
+                return;
+            }
+            for (String line : automation.command(java.util.Arrays.asList(params)))
+                sender.sendMessage(prefix + " " + line);
+        }));
+        commandManager.register("sandbox", ((sender, params) -> {
+            if (!sender.hasPermission("web.tasks") && !sender.hasPermission("web.*") && !sender.isOp()) {
+                sender.sendMessage(prefix + " You do not have permission to inspect the sandbox.");
+                return;
+            }
+            if (automation == null) {
+                sender.sendMessage(prefix + " Sandbox not initialized.");
+                return;
+            }
+            for (String line : automation.command(java.util.List.of("sandbox")))
+                sender.sendMessage(prefix + " " + line);
+        }));
         commandManager.register("help", ((sender, params) -> {
             if (sender.hasPermission("web.help") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " Commands: ");
