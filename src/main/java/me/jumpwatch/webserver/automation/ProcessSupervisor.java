@@ -1,6 +1,5 @@
 package me.jumpwatch.webserver.automation;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -149,6 +148,9 @@ public final class ProcessSupervisor implements AutoCloseable {
                         slot.timedOut = true;
                         log.accept("Task " + slot.name + " timed out");
                         terminateTree(process);
+                        control.schedule(() -> {
+                            if (process.isAlive()) forceTerminateTree(process);
+                        }, 5, TimeUnit.SECONDS);
                     }
                 }, slot.spec.timeoutSeconds, TimeUnit.SECONDS);
             }
@@ -161,10 +163,28 @@ public final class ProcessSupervisor implements AutoCloseable {
         }
     }
 
+    /** Never allow a task that omits newlines to accumulate an unbounded readLine() buffer. */
     private void drain(Slot slot, Process process) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) addLog(slot, line);
+        try (InputStreamReader reader = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+            char[] chunk = new char[2048];
+            StringBuilder line = new StringBuilder(MAX_LINE_CHARS);
+            boolean truncated = false;
+            int read;
+            while ((read = reader.read(chunk)) != -1) {
+                for (int i = 0; i < read; i++) {
+                    char ch = chunk[i];
+                    if (ch == '\n') {
+                        addLog(slot, line.toString() + (truncated ? " [truncated]" : ""));
+                        line.setLength(0);
+                        truncated = false;
+                    } else if (ch != '\r') {
+                        if (line.length() < MAX_LINE_CHARS - 16) line.append(ch);
+                        else truncated = true;
+                    }
+                }
+            }
+            if (line.length() > 0 || truncated)
+                addLog(slot, line.toString() + (truncated ? " [truncated]" : ""));
         } catch (IOException ex) {
             addLog(slot, "Output unavailable: " + ex.getMessage());
         }
