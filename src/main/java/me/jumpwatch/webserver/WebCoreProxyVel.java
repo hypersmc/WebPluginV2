@@ -170,6 +170,22 @@ public class WebCoreProxyVel  {
             }
         }
         }
+        proxyServer.getCommandManager().register(
+                proxyServer.getCommandManager().metaBuilder("webptasks").plugin(this).build(),
+                new com.velocitypowered.api.command.SimpleCommand() {
+                    @Override public void execute(Invocation invocation) {
+                        if (!invocation.source().hasPermission("webplugin.tasks")) {
+                            invocation.source().sendMessage(net.kyori.adventure.text.Component.text("[WebPlugin] No permission."));
+                            return;
+                        }
+                        if (automation == null) {
+                            invocation.source().sendMessage(net.kyori.adventure.text.Component.text("[WebPlugin] Automation not initialized."));
+                            return;
+                        }
+                        for (String line : automation.command(java.util.Arrays.asList(invocation.arguments())))
+                            invocation.source().sendMessage(net.kyori.adventure.text.Component.text("[WebPlugin] " + line));
+                    }
+                });
         boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()){
             Startwebserverhtml();
