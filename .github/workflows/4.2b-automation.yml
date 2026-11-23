@@ -34,7 +34,8 @@ jobs:
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.TaskEngineSmokeTest
       - name: Build and probe native Landlock helper
         run: |
-          gcc -std=gnu11 -O2 -Wall -Wextra -o target/webplugin-landlock native/webplugin-landlock.c
+          gcc -std=gnu11 -static -O2 -Wall -Wextra -o target/webplugin-landlock native/webplugin-landlock.c
+          sha256sum target/webplugin-landlock
           set +e
           target/webplugin-landlock --probe
           rc=$?
@@ -52,3 +53,12 @@ jobs:
             10|11|12) echo "Landlock unavailable on runner ($rc); sandbox enforcement test skipped";;
             *) echo "Landlock probe unexpectedly failed with $rc"; exit 1;;
           esac
+      - name: Publish Linux x86-64 beta test binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebPlugin-4.2B-linux-amd64
+          path: |
+            target/WebPlugin-4.2B.jar
+            target/webplugin-landlock
+          if-no-files-found: error
+          retention-days: 14
