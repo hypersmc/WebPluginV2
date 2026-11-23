@@ -1,16 +1,22 @@
 package me.jumpwatch.webserver.php.linux;
 
 import me.jumpwatch.webserver.WebCore;
+import me.jumpwatch.webserver.php.linux.runtime.LinuxPhpProcessRunner;
+import me.jumpwatch.webserver.php.linux.runtime.LinuxPhpRuntimeOptions;
 import me.jumpwatch.webserver.utils.DebugLogger;
 import me.jumpwatch.webserver.utils.WPLogger;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.configuration.ConfigurationSection;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
@@ -55,7 +61,6 @@ public class PHPWebServer{
             updateEntireNGINXConfig(path2, PHPPort, FPMPort, IndexLocation, ServerIP, main, ServerPath, sslPort, sslDomain, sslPriv, sslPubl);
             updateCGIConfig(path3, ServerSoftware);
             updateCGIParms(path4, ServerSoftware);
-            fixlibrary();
             return true;
         } catch (Exception e) {
             if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
@@ -338,40 +343,8 @@ public class PHPWebServer{
         }
     }
     public void fixlibrary() {
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "export LD_LIBRARY_PATH=/home/container/plugins/webplugin/phplinux/bin/php8/lib:$LD_LIBRARY_PATH\n"
-        };
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                WPLogger.info(line);
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                WPLogger.warn(line);
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Exit code: " + exitCode);
-        } catch (IOException | InterruptedException e) {
-            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
-        }
+        // Kept for binary/source compatibility with older code paths.
+        // LD_LIBRARY_PATH is now applied to the php-fpm ProcessBuilder directly.
     }
     private boolean isFolia() {
         try {
@@ -385,81 +358,64 @@ public class PHPWebServer{
     }
 
     private void runPHPFPM(){
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "cd ~/plugins/webplugin/phplinux/bin/php8/sbin/ \n" +
-                        main.getConfig().getString("Settings.ServerLocation") + "plugins/webplugin/phplinux/bin/php8/lib/glibc/lib/ld-linux-x86-64.so.2 --library-path " + main.getConfig().getString("Settings.ServerLocation") + "plugins/webplugin/phplinux/bin/php8/lib/glibc/lib:" + main.getConfig().getString("Settings.ServerLocation") + "plugins/webplugin/phplinux/bin/php8/lib/libonig/lib:/home/container/plugins/webplugin/phplinux/bin/php8/lib/libz/lib ./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
-        };
-        Process p = null;
         try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Exit code: " + exitCode);
-            WPLogger.info("Output: " + output.toString());
-
-
-        } catch (IOException | InterruptedException e) {
+            LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+            runner.startPhpFpm();
+        } catch (InterruptedException e) {
             if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
         }
     }
 
     private void runNGINX(){
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "cd ~/plugins/webplugin/nginxlinux/bin/nginx/sbin/ \n" +
-                        "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf -p ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/"
-        };
-        Process p = null;
         try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Exit code: " + exitCode);
-            WPLogger.info("Output: " + output.toString());
-
-        } catch (IOException | InterruptedException e) {
+            LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+            runner.startNginx();
+        } catch (InterruptedException e) {
             if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
+            Thread.currentThread().interrupt();
+        } catch (IOException e) {
+            if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
         }
     }
+
+    private LinuxPhpRuntimeOptions runtimeOptions() {
+        return new LinuxPhpRuntimeOptions(
+                main.getDataFolder(),
+                main.getConfig().getString("Settings.ServerLocation"),
+                main.getConfig().getBoolean("Settings.debug"),
+                main.getConfig().getBoolean("Settings.PHPDetectExtensionsFromIni", true),
+                main.getConfig().getStringList("Settings.PHPExtensions"),
+                main.getConfig().getStringList("Settings.PHPExtraLibraryPaths"),
+                extensionLibraryPathsFromConfig(),
+                main.getConfig().getBoolean("Settings.PHPPreflightCheck", true)
+        );
+    }
+
+    private Map<String, List<String>> extensionLibraryPathsFromConfig() {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        ConfigurationSection section = main.getConfig().getConfigurationSection("Settings.PHPExtensionLibraryPaths");
+        if (section == null) {
+            return result;
+        }
+        for (String key : section.getKeys(false)) {
+            List<String> values = section.getStringList(key);
+            if (!values.isEmpty()) {
+                result.put(key, values);
+                continue;
+            }
+            String singleValue = section.getString(key);
+            if (singleValue != null && !singleValue.trim().isEmpty()) {
+                List<String> single = new ArrayList<>();
+                single.add(singleValue);
+                result.put(key, single);
+            }
+        }
+        return result;
+    }
+
     public static String generateNginxConfig(int workerProcesses) {
         if (workerProcesses < 1 || workerProcesses > 256) {
             throw new IllegalArgumentException("Worker processes must be between 1 and 256.");

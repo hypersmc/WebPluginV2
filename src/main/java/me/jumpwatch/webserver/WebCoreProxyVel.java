@@ -33,10 +33,10 @@ import java.util.logging.Logger;
  * @Project WebPluginV2
  * v1.0.0
  */
-@Plugin(id= "webplugin", name = "webplugin", version = "2.6.1R", authors = "JumpWatch, HypersMC, HumpJump")
+@Plugin(id= "webplugin", name = "webplugin", version = "4.0R", authors = "JumpWatch, HypersMC, HumpJump")
 public class WebCoreProxyVel  {
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(WebCoreProxyVel.class);
-    public String pluginversion = "2.6.1R";
+    public String pluginversion = "4.0R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private int portphp;
@@ -46,7 +46,7 @@ public class WebCoreProxyVel  {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 15;
+    private int version = 18;
     public ContentTypeResolver resolver;
     private ScheduledTask scheduledTask;
     private ScheduledTask scheduledTaskSSL;
@@ -138,7 +138,7 @@ public class WebCoreProxyVel  {
         if (!(new File(getDataFolder() + "/php/").exists())){
             setphpfiles();
         }
-        if (new File("plugins/WebPlugin/ssl/").exists()){
+        if (new File("plugins/webplugin/ssl/").exists()){
             logger.info("SSL Folder exist!");
         }else {
             logger.info("SSL Folder doesn't exist!");
@@ -149,13 +149,13 @@ public class WebCoreProxyVel  {
                 removeme.delete();
             }
         }
-        if (new File("plugins/WebPlugin/ssl/" + sslSettings.get("SSLJKSName") + ".jks").exists()){
+        if (new File("plugins/webplugin/ssl/" + sslSettings.get("SSLJKSName") + ".jks").exists()){
             logger.info("SSL File exist!");
         } else {
             logger.info("SSL File doesn't exist!");
         }
         if (CheckOS.isWindows()) {
-            logger.severe("Currently i cannot make php work on windows in a proxy server.");
+            logger.severe("Windows is not supported!");
         }
         if (settings.get("HTMLPORT") != null){
             try {
@@ -177,9 +177,6 @@ public class WebCoreProxyVel  {
         }
         if (CheckOS.isWindows()){
             Startwebserverhtml();
-            //Startwebserverphp();
-            //I'm currently unable to make PHP work because I can't access libraries the same way as on SpigotMC. An alternative fix is under way :)
-            //It's not prioritized as most hosts are using linux docker containers
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
@@ -307,17 +304,43 @@ public class WebCoreProxyVel  {
     private void StartwebserverphpLinux() {
         boolean enablePHP = (boolean) settings.get("EnablePHP");
         if (enablePHP) {
-            if (!new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
-                PhpInstaller.installphp();
-                PhpInstaller.FilePermissions(); //Extra check as you never know :)
-                if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+            File phpBinary = new File(dataFolder, "phplinux/bin/php8/bin/php");
+            if (!phpBinary.exists()) {
+                boolean installed = PhpInstaller.installphp(
+                        dataFolder,
+                        asString(config.get("GithubWebPluginPHPRepo")),
+                        asString(config.get("GithubWebPluginPHPRepoFilename")),
+                        asString(config.get("GithubWebPluginNGINXRepoFilename")),
+                        debugEnabled()
+                );
+                if (installed && phpBinary.exists()) {
                     new PHPWebServerVel(this).start();
                 }
             } else {
+                PhpInstaller.FilePermissions(dataFolder);
                 new PHPWebServerVel(this).start();
             }
         }
     }
+
+    private boolean debugEnabled() {
+        return asBoolean(WebCoreProxyVel.settings.get("debug"), false);
+    }
+
+    private String asString(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private boolean asBoolean(Object value, boolean defaultValue) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof String) {
+            return Boolean.parseBoolean((String) value);
+        }
+        return defaultValue;
+    }
+
     private void Startwebserverhtml(){
         acceptorRunning = true;
         boolean enableHTML = (Boolean) settings.get("EnableHTML");

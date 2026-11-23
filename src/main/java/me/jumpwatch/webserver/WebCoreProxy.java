@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  */
 public class WebCoreProxy extends Plugin {
     public Configuration configuration;
-    public String pluginversion = "2.6.1R";
+    public String pluginversion = "4.0R";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private WebCoreProxy m = this;
@@ -42,7 +42,7 @@ public class WebCoreProxy extends Plugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 15;
+    private int version = 18;
     public ContentTypeResolver resolver;
     private Logger logger = Logger.getLogger("WebPluginProxyBun");
     public static File dataFolder;
@@ -71,7 +71,7 @@ public class WebCoreProxy extends Plugin {
         if (!(new File(getDataFolder() + "/php/").exists())){
             setphpfiles();
         }
-        if (new File("plugins/WebPlugin/ssl/").exists()){
+        if (new File("plugins/webplugin/ssl/").exists()){
             logger.info("SSL Folder exist!");
         }else {
             logger.info("SSL Folder doesn't exist!");
@@ -82,13 +82,13 @@ public class WebCoreProxy extends Plugin {
                 removeme.delete();
             }
         } //configuration.getString
-        if (new File("plugins/WebPlugin/ssl/" + configuration.getString("SSLSettings.SSLJKSName") + ".jks").exists()){
+        if (new File("plugins/webplugin/ssl/" + configuration.getString("SSLSettings.SSLJKSName") + ".jks").exists()){
             logger.info("SSL File exist!");
         } else {
             logger.info("SSL File doesn't exist!");
         }
         if (CheckOS.isWindows()) {
-            logger.severe("Currently i cannot make php work on windows in a proxy server.");
+            logger.severe("Windows is not supported!");
         }
         if (configuration.getString("Settings.HTMLPORT") != null){
             try {
@@ -110,8 +110,6 @@ public class WebCoreProxy extends Plugin {
         }
         if (CheckOS.isWindows()){
             Startwebserverhtml();
-            //Startwebserverphp();
-            //I'm currently unable to make PHP work because I can't access libraries the same way as on SpigotMC.
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
@@ -209,13 +207,20 @@ public class WebCoreProxy extends Plugin {
     private void StartwebserverphpLinux() {
         boolean enablePHP = (Boolean) configuration.getBoolean("Settings.EnablePHP");
         if (enablePHP) {
-            if (!new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
-                PhpInstaller.installphp();
-                PhpInstaller.FilePermissions(); //Extra check as you never know :)
-                if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+            File phpBinary = new File(getDataFolder(), "phplinux/bin/php8/bin/php");
+            if (!phpBinary.exists()) {
+                boolean installed = PhpInstaller.installphp(
+                        getDataFolder(),
+                        configuration.getString("GithubWebPluginPHPRepo"),
+                        configuration.getString("GithubWebPluginPHPRepoFilename"),
+                        configuration.getString("GithubWebPluginNGINXRepoFilename"),
+                        configuration.getBoolean("Settings.debug")
+                );
+                if (installed && phpBinary.exists()) {
                     new PHPWebServerBun(this).start();
                 }
             } else {
+                PhpInstaller.FilePermissions(getDataFolder());
                 new PHPWebServerBun(this).start();
             }
         }

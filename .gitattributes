@@ -1,0 +1,20 @@
+# Normalize line endings in source control.
+* text=auto
+
+# Keep scripts/text predictable.
+*.java text eol=lf
+*.xml text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+
+# Binary files.
+*.jar binary
+*.zip binary
+*.gz binary
+*.tar binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary

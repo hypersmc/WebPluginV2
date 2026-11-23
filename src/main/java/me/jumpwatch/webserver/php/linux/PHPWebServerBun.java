@@ -1,13 +1,19 @@
 package me.jumpwatch.webserver.php.linux;
 
 import me.jumpwatch.webserver.WebCoreProxy;
+import me.jumpwatch.webserver.php.linux.runtime.LinuxPhpProcessRunner;
+import me.jumpwatch.webserver.php.linux.runtime.LinuxPhpRuntimeOptions;
 import me.jumpwatch.webserver.utils.DebugLogger;
 import me.jumpwatch.webserver.utils.WPLogger;
 import net.md_5.bungee.api.ProxyServer;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -226,81 +232,76 @@ public class PHPWebServerBun{
     }
     private void startphpfpm(){
         ProxyServer.getInstance().getScheduler().schedule(main, () -> {
-            String[] cmd = {
-                    "/bin/sh", "-c",
-                    "cd ~/plugins/webplugin/phplinux/bin/php8/sbin/ \n" +
-                            "./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
-            };
-            Process p = null;
             try {
-                p = Runtime.getRuntime().exec(cmd);
-
-                // Read output streams
-                BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-                StringBuilder output = new StringBuilder();
-                String line;
-                while ((line = stdInput.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                // Read any errors
-                while ((line = stdError.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                int exitCode = p.waitFor();
-                WPLogger.info("Exit code: " + exitCode);
-                WPLogger.info("Output: " + output.toString());
-
-            } catch (IOException | InterruptedException e) {
+                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                runner.startPhpFpm();
+            } catch (InterruptedException e) {
                 if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
-            } finally {
-                if (p != null) {
-                    p.destroy();
-                }
+                Thread.currentThread().interrupt();
+            } catch (IOException e) {
+                if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             }
-        }, 1l, TimeUnit.MILLISECONDS);
+        }, 1L, TimeUnit.MILLISECONDS);
     }
     private void startnginxfpm(){
         ProxyServer.getInstance().getScheduler().schedule(main, () -> {
-            String[] cmd = {
-                    "/bin/sh", "-c",
-                    "cd ~/plugins/webplugin/nginxlinux/bin/nginx/sbin/ \n" +
-                            "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf"
-            };
-            Process p = null;
             try {
-                p = Runtime.getRuntime().exec(cmd);
-
-                // Read output streams
-                BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-                StringBuilder output = new StringBuilder();
-                String line;
-                while ((line = stdInput.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                // Read any errors
-                while ((line = stdError.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                int exitCode = p.waitFor();
-                WPLogger.info("Exit code: " + exitCode);
-                WPLogger.info("Output: " + output.toString());
-
-            } catch (IOException | InterruptedException e) {
+                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                runner.startNginx();
+            } catch (InterruptedException e) {
                 if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
-            } finally {
-                if (p != null) {
-                    p.destroy();
-                }
+                Thread.currentThread().interrupt();
+            } catch (IOException e) {
+                if (main.configuration.getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
             }
-        }, 1l, TimeUnit.MILLISECONDS);
+        }, 1L, TimeUnit.MILLISECONDS);
 
     }
+
+    private LinuxPhpRuntimeOptions runtimeOptions() {
+        return new LinuxPhpRuntimeOptions(
+                main.getDataFolder(),
+                main.configuration.getString("Settings.ServerLocation"),
+                main.configuration.getBoolean("Settings.debug"),
+                getBoolean("Settings.PHPDetectExtensionsFromIni", true),
+                new ArrayList<>(main.configuration.getStringList("Settings.PHPExtensions")),
+                new ArrayList<>(main.configuration.getStringList("Settings.PHPExtraLibraryPaths")),
+                extensionLibraryPathsFromConfig(),
+                getBoolean("Settings.PHPPreflightCheck", true)
+        );
+    }
+
+    private boolean getBoolean(String path, boolean defaultValue) {
+        Object value = main.configuration.get(path);
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof String) {
+            return Boolean.parseBoolean((String) value);
+        }
+        return defaultValue;
+    }
+
+    private Map<String, List<String>> extensionLibraryPathsFromConfig() {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        net.md_5.bungee.config.Configuration section = main.configuration.getSection("Settings.PHPExtensionLibraryPaths");
+        if (section == null) {
+            return result;
+        }
+        for (String key : section.getKeys()) {
+            Collection<String> configured = section.getStringList(key);
+            if (configured != null && !configured.isEmpty()) {
+                result.put(key, new ArrayList<>(configured));
+                continue;
+            }
+            String singleValue = section.getString(key);
+            if (singleValue != null && !singleValue.trim().isEmpty()) {
+                List<String> single = new ArrayList<>();
+                single.add(singleValue);
+                result.put(key, single);
+            }
+        }
+        return result;
+    }
+
 }

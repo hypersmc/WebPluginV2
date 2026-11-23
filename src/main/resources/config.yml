@@ -24,13 +24,56 @@ Settings:
   # ── PHP Settings ──
   EnablePHP: false
   PHPFolderPermissionFix: false       # Runs `chown -R www-data`, auto disables after run.
+
+  # PHP runtime library handling.
+  # WebPlugin starts php-fpm with a generated php.ini and LD_LIBRARY_PATH.
+  # Empty PHPExtensions means WebPlugin tries to detect enabled extension= lines
+  # from the bundled php.ini for backwards compatibility. For the modular runtime,
+  # prefer setting PHPExtensions here and let WebPlugin generate php.ini.
+  PHPDetectExtensionsFromIni: false
+  PHPPreflightCheck: true
+  # Extensions must exist under phplinux/bin/php8/extension-packs/<name>/.
+  # The modular runtime archive contains these packs, but only this list is loaded.
+  PHPExtensions:
+    - opcache
+    - openssl
+    - zlib
+    - ctype
+    - curl
+    - mbstring
+    # mbregex is built into mbstring; adding mbregex also maps to mbstring.
+    - intl
+    - fileinfo
+    - pdo_sqlite
+    - sqlite3
+    - pdo_mysql
+    - mysqli
+    - zip
+    - xml
+    - dom
+    - simplexml
+    - xmlreader
+    - xmlwriter
+    - gd
+    - exif
+    - bcmath
+    - calendar
+    - sockets
+    - ftp
+    - tokenizer
+
+  # Extra runtime library paths. The modular runtime reads base paths from
+  # runtime-manifest.properties, so this is usually only for manual overrides.
+  PHPExtraLibraryPaths: []
+
+  # Optional compatibility mapping for old runtimes or manual native library overrides.
+  # The modular runtime primarily uses each extension pack's extension.properties file.
+  PHPExtensionLibraryPaths: {}
+
   # ── Dependencies Reminder ──
-  # IMPORTANT: If PHP is enabled, the plugin WILL automatically download
-  # critical system libraries (GLIBC, LIBONIG, LIBZ) from the GitHub repo.
-  # These libraries are essential for the system to work, and are required
-  # for PHP, NGINX (Which is also downloaded from the repo),
-  # and other components to function properly.
-  # Check further down for info.
+  # The modular PHP archive is self-contained and includes the native libs it needs
+  # under phplinux/bin/php8/lib/base, lib/glibc/lib, and extension-packs/*/libs.
+  # WebPlugin does not download GLIBC/LIBONIG/LIBZ as separate archives anymore.
 
   # ── HTML Settings ──
   EnableHTML: true                  # PHP can also serve HTML.
@@ -56,8 +99,8 @@ Linuxphpsettings:
 
 # ── GitHub Repo Resources ──
 GithubWebPluginPHPRepo: https://github.com/hypersmc/WebPluginV2Repo
-GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.3-PRECOMPILED.tar.gz
-GithubWebPluginNGINXRepoFilename: WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz
+GithubWebPluginPHPRepoFilename: WebPlugin-linux-PHP8.4.27-MODULAR.tar.gz
+GithubWebPluginNGINXRepoFilename: WebPlugin-linux-NGINX-1.30.6-PRECOMPILED.tar.gz
 
 # ── Internal ──
-ConfigVersion: 15                  # DO NOT EDIT
+ConfigVersion: 18                  # DO NOT EDIT

@@ -1,6 +1,8 @@
 package me.jumpwatch.webserver.php.linux;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import me.jumpwatch.webserver.WebCoreProxyVel;
+import me.jumpwatch.webserver.php.linux.runtime.LinuxPhpProcessRunner;
+import me.jumpwatch.webserver.php.linux.runtime.LinuxPhpRuntimeOptions;
 import me.jumpwatch.webserver.utils.DebugLogger;
 import me.jumpwatch.webserver.utils.WPLogger;
 
@@ -9,7 +11,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 
@@ -54,7 +60,7 @@ public class PHPWebServerVel{
             updateCGIParms(path4, ServerSoftware);
             return true;
         } catch (Exception e) {
-            if ((boolean)WebCoreProxyVel.settings.get("Settings.debug")) DebugLogger.error(e.getMessage());
+            if (debugEnabled()) DebugLogger.error(e.getMessage());
             return false;
         }
     }
@@ -220,83 +226,94 @@ public class PHPWebServerVel{
     }
     private void startphpfpm(){
         php = main.proxyServer.getScheduler().buildTask(main, () -> {
-            String[] cmd = {
-                    "/bin/sh", "-c",
-                    "cd ~/plugins/webplugin/phplinux/bin/php8/sbin/ \n" +
-                            "./php-fpm -p ~/" + main.getDataFolder() + "/phplinux/bin/php8 \n"
-            };
-            Process p = null;
             try {
-                p = Runtime.getRuntime().exec(cmd);
-
-                // Read output streams
-                BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-                StringBuilder output = new StringBuilder();
-                String line;
-                while ((line = stdInput.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                // Read any errors
-                while ((line = stdError.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                int exitCode = p.waitFor();
-                WPLogger.info("Exit code: " + exitCode);
-                WPLogger.info("Output: " + output.toString());
-
-            } catch (IOException | InterruptedException e) {
-                if ((boolean)WebCoreProxyVel.settings.get("Settings.debug")) DebugLogger.error(e.getMessage());
-            } finally {
-                if (p != null) {
-                    p.destroy();
-                }
+                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                runner.startPhpFpm();
+            } catch (InterruptedException e) {
+                if (debugEnabled()) DebugLogger.error(e.getMessage());
+                Thread.currentThread().interrupt();
+            } catch (IOException e) {
+                if (debugEnabled()) DebugLogger.error(e.getMessage());
             }
-        }).schedule(); // Adjust delay as necessary
+        }).schedule();
     }
     private void startnginxfpm(){
         nginx = main.proxyServer.getScheduler().buildTask(main, () -> {
-            String[] cmd = {
-                    "/bin/sh", "-c",
-                    "cd ~/plugins/webplugin/nginxlinux/bin/nginx/sbin/ \n" +
-                            "./nginx -c ~/" + main.getDataFolder() + "/nginxlinux/bin/nginx/conf/nginx.conf"
-            };
-            Process p = null;
             try {
-                p = Runtime.getRuntime().exec(cmd);
-
-                // Read output streams
-                BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-                StringBuilder output = new StringBuilder();
-                String line;
-                while ((line = stdInput.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                // Read any errors
-                while ((line = stdError.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-
-                int exitCode = p.waitFor();
-                WPLogger.info("Exit code: " + exitCode);
-                WPLogger.info("Output: " + output.toString());
-
-            } catch (IOException | InterruptedException e) {
-                if ((boolean)WebCoreProxyVel.settings.get("Settings.debug")) DebugLogger.error(e.getMessage());
-            } finally {
-                if (p != null) {
-                    p.destroy();
-                }
+                LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+                runner.startNginx();
+            } catch (InterruptedException e) {
+                if (debugEnabled()) DebugLogger.error(e.getMessage());
+                Thread.currentThread().interrupt();
+            } catch (IOException e) {
+                if (debugEnabled()) DebugLogger.error(e.getMessage());
             }
-        }).schedule(); // Adjust delay as necessary
+        }).schedule();
 
     }
+
+    private LinuxPhpRuntimeOptions runtimeOptions() {
+        return new LinuxPhpRuntimeOptions(
+                main.getDataFolder(),
+                asString(WebCoreProxyVel.settings.get("ServerLocation")),
+                debugEnabled(),
+                asBoolean(WebCoreProxyVel.settings.get("PHPDetectExtensionsFromIni"), true),
+                stringList(WebCoreProxyVel.settings.get("PHPExtensions")),
+                stringList(WebCoreProxyVel.settings.get("PHPExtraLibraryPaths")),
+                extensionLibraryPathsFromConfig(),
+                asBoolean(WebCoreProxyVel.settings.get("PHPPreflightCheck"), true)
+        );
+    }
+
+    private boolean debugEnabled() {
+        return asBoolean(WebCoreProxyVel.settings.get("debug"), false);
+    }
+
+    private String asString(Object value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private boolean asBoolean(Object value, boolean defaultValue) {
+        if (value instanceof Boolean) {
+            return (Boolean) value;
+        }
+        if (value instanceof String) {
+            return Boolean.parseBoolean((String) value);
+        }
+        return defaultValue;
+    }
+
+    private List<String> stringList(Object value) {
+        List<String> result = new ArrayList<>();
+        if (value instanceof Collection<?>) {
+            for (Object entry : (Collection<?>) value) {
+                if (entry != null) {
+                    result.add(String.valueOf(entry));
+                }
+            }
+        } else if (value instanceof String && !((String) value).trim().isEmpty()) {
+            result.add((String) value);
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, List<String>> extensionLibraryPathsFromConfig() {
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        Object raw = WebCoreProxyVel.settings.get("PHPExtensionLibraryPaths");
+        if (!(raw instanceof Map<?, ?>)) {
+            return result;
+        }
+        Map<Object, Object> map = (Map<Object, Object>) raw;
+        for (Map.Entry<Object, Object> entry : map.entrySet()) {
+            if (entry.getKey() == null) {
+                continue;
+            }
+            result.put(String.valueOf(entry.getKey()), stringList(entry.getValue()));
+        }
+        return result;
+    }
+
     public void stopsystem(){
         php.cancel();
         nginx.cancel();

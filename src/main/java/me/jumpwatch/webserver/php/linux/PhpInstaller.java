@@ -1,341 +1,258 @@
 package me.jumpwatch.webserver.php.linux;
 
-
-import me.jumpwatch.webserver.WebCore;
 import me.jumpwatch.webserver.utils.DebugLogger;
 import me.jumpwatch.webserver.utils.WPLogger;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Objects;
-import java.util.logging.Logger;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
-/**
- * @author JumpWatch on 29-07-2024
- * @Project WebPluginV2
- * v1.0.0
- */
-public class PhpInstaller {
-    private static Logger logger = Logger.getLogger("WebPluginPHPInstaller");
+/** Installs the Linux PHP/NGINX runtime without relying on wget or hardcoded /home/container paths. */
+public final class PhpInstaller {
+    private static final String DEFAULT_REPO = "https://github.com/hypersmc/WebPluginV2Repo";
+    private static final String DEFAULT_PHP_ARCHIVE = "WebPlugin-linux-PHP8.4.8-MODULAR.tar.gz";
+    private static final String DEFAULT_NGINX_ARCHIVE = "WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz";
+
+    private PhpInstaller() {
+    }
+
+    /** Deprecated compatibility entrypoint. Use installphp(File, String, String, String, boolean). */
     public static void installphp() {
-        WebCore main = JavaPlugin.getPlugin(WebCore.class);
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "mkdir ~/plugins/webplugin/phplinux \n" +
-                        "cd ~/plugins/webplugin/phplinux \n" +
-                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/"+ Objects.requireNonNullElse(main.getConfig().getString("Settings.GithubWebPluginPHPRepoFilename"), "WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz") + " \n" +
-                        "tar -xzvf " + Objects.requireNonNullElse(main.getConfig().getString("Settings.GithubWebPluginPHPRepoFilename"), "WebPlugin-linux-PHP8.2-PRECOMPILED.tar.gz") + " \n" +
-                        "cp ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.conf.default ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.conf \n" +
-                        "cp ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.d/www.conf.default ~/plugins/webplugin/phplinux/bin/php8/etc/php-fpm.d/www.conf \n" +
-                        "mkdir ~/plugins/webplugin/phplinux/bin/php8/log \n" +
-                        "touch ~/plugins/webplugin/phplinux/bin/php8/log/php-fpm.log \n"
-        };
-        Process p = null;
+        WPLogger.warn("PhpInstaller.installphp() was called without a data folder. This legacy entrypoint cannot install safely on proxy platforms.");
+    }
+
+    public static boolean installphp(File dataFolder, String repo, String phpArchiveName, String nginxArchiveName, boolean debug) {
+        boolean phpInstalled = installPhpRuntime(dataFolder, repo, phpArchiveName, debug);
+        boolean nginxInstalled = installNginxRuntime(dataFolder, repo, nginxArchiveName, debug);
+        return phpInstalled && nginxInstalled;
+    }
+
+    public static boolean installPhpRuntime(File dataFolder, String repo, String phpArchiveName, boolean debug) {
+        Path phplinux = dataFolder.toPath().resolve("phplinux").normalize();
+        Path phpRoot = phplinux.resolve("bin").resolve("php8").normalize();
+        String archiveName = defaultIfBlank(phpArchiveName, DEFAULT_PHP_ARCHIVE);
+
         try {
-            p = Runtime.getRuntime().exec(cmd);
+            Files.createDirectories(phplinux);
+            Path archive = download(resourceUrl(repo, archiveName), phplinux.resolve(archiveName));
+            extractTarGz(archive, phplinux);
+            ensurePhpRuntimeFiles(phpRoot);
+            FilePermissions(dataFolder);
+            WPLogger.info("PHP runtime installed at " + phpRoot);
+            return true;
+        } catch (Exception e) {
+            if (debug) {
+                DebugLogger.error(e.getMessage());
+            }
+            WPLogger.warn("Failed to install PHP runtime: " + e.getMessage());
+            return false;
+        }
+    }
 
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+    public static boolean installNginxRuntime(File dataFolder, String repo, String nginxArchiveName, boolean debug) {
+        Path nginxlinux = dataFolder.toPath().resolve("nginxlinux").normalize();
+        Path nginxRoot = nginxlinux.resolve("bin").resolve("nginx").normalize();
+        String archiveName = defaultIfBlank(nginxArchiveName, DEFAULT_NGINX_ARCHIVE);
 
-            StringBuilder output = new StringBuilder();
+        try {
+            Files.createDirectories(nginxlinux);
+            Path archive = download(resourceUrl(repo, archiveName), nginxlinux.resolve(archiveName));
+            extractTarGz(archive, nginxlinux);
+            ensureNginxRuntimeFiles(nginxRoot);
+            FilePermissionsNGINX(dataFolder);
+            WPLogger.info("NGINX runtime installed at " + nginxRoot);
+            return true;
+        } catch (Exception e) {
+            if (debug) {
+                DebugLogger.error(e.getMessage());
+            }
+            WPLogger.warn("Failed to install NGINX runtime: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private static Path download(String url, Path destination) throws IOException, URISyntaxException {
+        Files.createDirectories(destination.getParent());
+        Path temporary = destination.resolveSibling(destination.getFileName() + ".tmp");
+        WPLogger.info("Downloading " + url);
+        try (InputStream input = new URI(url).toURL().openStream()) {
+            Files.copy(input, temporary, StandardCopyOption.REPLACE_EXISTING);
+        }
+        Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING);
+        return destination;
+    }
+
+    private static String resourceUrl(String repo, String archiveNameOrUrl) {
+        String archive = defaultIfBlank(archiveNameOrUrl, DEFAULT_PHP_ARCHIVE);
+        if (archive.startsWith("https://") || archive.startsWith("http://")) {
+            return archive;
+        }
+
+        String base = defaultIfBlank(repo, DEFAULT_REPO);
+        while (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+
+        if (base.contains("raw.githubusercontent.com") || base.contains("/raw/")) {
+            return base + "/" + archive;
+        }
+        if (base.contains("github.com")) {
+            return base + "/raw/main/" + archive;
+        }
+        return base + "/" + archive;
+    }
+
+    private static void extractTarGz(Path archive, Path destination) throws IOException, InterruptedException {
+        List<String> command = new ArrayList<>();
+        command.add("tar");
+        command.add("-xzf");
+        command.add(archive.toString());
+        command.add("-C");
+        command.add(destination.toString());
+
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
-            while ((line = stdInput.readLine()) != null) {
-                WPLogger.info(line);
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                WPLogger.warn(line);
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Process exited with code: " + exitCode);
-            FilePermissions();
-            installnginx();
-        } catch (IOException | InterruptedException e) {
-            DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append('\n');
             }
         }
-    }
-    public static void installnginx(){
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "mkdir ~/plugins/webplugin/nginxlinux \n" +
-                        "cd ~/plugins/webplugin/nginxlinux \n" +
-                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz \n" +
-                        "tar -xzvf WebPlugin-linux-NGINX-1.27.1-PRECOMPILED.tar.gz \n" +
-                        "mkdir ~/plugins/webplugin/nginxlinux/bin/nginx/logs \n" +
-                        "touch ~/plugins/webplugin/nginxlinux/bin/nginx/logs/error.log \n"
-        };
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                WPLogger.info(line);
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                WPLogger.warn(line);
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Process exited with code: " + exitCode);
-            FilePermissionsNGINX();
-            installglibc();
-        } catch (IOException | InterruptedException e) {
-            DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
-        }
-    }
-    public static void installlibonig(){
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/ \n" +
-                        "mkdir /home/container/plugins/webplugin/phplinux/bin/php8/lib/libonig/ \n" +
-                        "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/libonig/ \n" +
-                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-LIBONIG-PRECOMPILED.tar.gz \n"+
-                        "tar -xzvf WebPlugin-linux-LIBONIG-PRECOMPILED.tar.gz \n"
-        };
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                WPLogger.info(line);
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                WPLogger.warn(line);
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Process exited with code: " + exitCode);
-            FilePermissionsLIBONIG();
-            installlibz();
-        } catch (IOException | InterruptedException e) {
-            DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
-        }
-    }
-    public static void installlibz(){
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/ \n" +
-                        "mkdir /home/container/plugins/webplugin/phplinux/bin/php8/lib/libz/ \n" +
-                        "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/libz/ \n" +
-                        "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-LIBZ-PRECOMPILED.tar.gz \n"+
-                        "tar -xzvf WebPlugin-linux-LIBZ-PRECOMPILED.tar.gz \n"
-        };
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                WPLogger.info(line);
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                WPLogger.warn(line);
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Process exited with code: " + exitCode);
-            FilePermissionsLIBZ();
-        } catch (IOException | InterruptedException e) {
-            DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
-        }
-    }
-    public static void installglibc(){
-        String[] cmd = {
-                "/bin/sh", "-c",
-                "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/ \n" +
-                        "mkdir /home/container/plugins/webplugin/phplinux/bin/php8/lib/glibc/ \n" +
-                        "cd /home/container/plugins/webplugin/phplinux/bin/php8/lib/glibc/ \n" +
-                "wget https://github.com/hypersmc/WebPluginV2Repo/raw/main/WebPlugin-linux-GLIBC-PRECOMPILED.tar.gz \n"+
-                "tar -xzvf WebPlugin-linux-GLIBC-PRECOMPILED.tar.gz \n"
-        };
-        Process p = null;
-        try {
-            p = Runtime.getRuntime().exec(cmd);
-
-            // Read output streams
-            BufferedReader stdInput = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            BufferedReader stdError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
-
-            StringBuilder output = new StringBuilder();
-            String line;
-            while ((line = stdInput.readLine()) != null) {
-                WPLogger.info(line);
-                output.append(line).append("\n");
-            }
-
-            // Read any errors
-            while ((line = stdError.readLine()) != null) {
-                WPLogger.warn(line);
-                output.append(line).append("\n");
-            }
-
-            int exitCode = p.waitFor();
-            WPLogger.info("Process exited with code: " + exitCode);
-            FilePermissionsGLIBC();
-            installlibonig();
-        } catch (IOException | InterruptedException e) {
-            DebugLogger.error(e.getMessage());
-        } finally {
-            if (p != null) {
-                p.destroy();
-            }
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            throw new IOException("tar failed with exit code " + exitCode + ":\n" + output);
         }
     }
 
-    public static void FilePermissionsGLIBC(){
-        File php = new File("plugins/webplugin/phplinux/bin/php8/lib/glibc/lib/libm.so.6");
-        try {
-            php.setExecutable(true, false);
-            php.setReadable(true, false);
-            php.setWritable(true, false);
-            WPLogger.info("File permission check success!");
-            FolderPermissions();
-        } catch (Exception e) {
+    private static void ensurePhpRuntimeFiles(Path phpRoot) throws IOException {
+        Path php = phpRoot.resolve("bin").resolve("php");
+        Path phpFpm = phpRoot.resolve("sbin").resolve("php-fpm");
+        if (!Files.isRegularFile(php)) {
+            throw new IOException("PHP binary missing after extract: " + php);
+        }
+        if (!Files.isRegularFile(phpFpm)) {
+            throw new IOException("php-fpm binary missing after extract: " + phpFpm);
+        }
 
-            DebugLogger.error(e.getMessage());
-            
+        copyIfMissing(phpRoot.resolve("etc").resolve("php-fpm.conf.default"), phpRoot.resolve("etc").resolve("php-fpm.conf"));
+        copyIfMissing(phpRoot.resolve("etc").resolve("php-fpm.d").resolve("www.conf.default"), phpRoot.resolve("etc").resolve("php-fpm.d").resolve("www.conf"));
+        Files.createDirectories(phpRoot.resolve("log"));
+        touch(phpRoot.resolve("log").resolve("php-fpm.log"));
+    }
+
+    private static void ensureNginxRuntimeFiles(Path nginxRoot) throws IOException {
+        Path nginx = nginxRoot.resolve("sbin").resolve("nginx");
+        if (!Files.isRegularFile(nginx)) {
+            throw new IOException("NGINX binary missing after extract: " + nginx);
+        }
+        Files.createDirectories(nginxRoot.resolve("logs"));
+        touch(nginxRoot.resolve("logs").resolve("error.log"));
+        touch(nginxRoot.resolve("logs").resolve("access.log"));
+    }
+
+    private static void copyIfMissing(Path source, Path target) throws IOException {
+        if (Files.isRegularFile(source) && !Files.exists(target)) {
+            Files.createDirectories(target.getParent());
+            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
-    public static void FilePermissionsLIBZ(){
-        File php = new File("plugins/webplugin/phplinux/bin/php8/lib/libz/lib/libz.so.1.3.1");
-        try {
-            php.setExecutable(true, false);
-            php.setReadable(true, false);
-            php.setWritable(true, false);
-            WPLogger.info("File permission check success!");
-            FolderPermissions();
-        } catch (Exception e) {
-            DebugLogger.error(e.getMessage());
 
+    private static void touch(Path path) throws IOException {
+        Files.createDirectories(path.getParent());
+        if (!Files.exists(path)) {
+            Files.createFile(path);
         }
     }
-    public static void FilePermissionsLIBONIG(){
-        File php = new File("plugins/webplugin/phplinux/bin/php8/lib/libonig/lib/libonig.so.5.2.0");
-        try {
-            php.setExecutable(true, false);
-            php.setReadable(true, false);
-            php.setWritable(true, false);
-            WPLogger.info("File permission check success!");
-            FolderPermissions();
-        } catch (Exception e) {
-            DebugLogger.error(e.getMessage());
 
+    public static void FilePermissions() {
+        FilePermissions(new File("plugins/webplugin"));
+    }
+
+    public static void FilePermissions(File dataFolder) {
+        Path phpRoot = dataFolder.toPath().resolve("phplinux").resolve("bin").resolve("php8").normalize();
+        markExecutable(phpRoot.resolve("bin").resolve("php"));
+        markExecutable(phpRoot.resolve("sbin").resolve("php-fpm"));
+        markExecutable(phpRoot.resolve("lib").resolve("glibc").resolve("lib").resolve("ld-linux-x86-64.so.2"));
+        markExecutableRecursive(phpRoot.resolve("extension-packs"));
+        markExecutableRecursive(phpRoot.resolve("lib"));
+        FolderPermissions(dataFolder);
+    }
+
+    public static void FilePermissionsNGINX() {
+        FilePermissionsNGINX(new File("plugins/webplugin"));
+    }
+
+    public static void FilePermissionsNGINX(File dataFolder) {
+        Path nginxRoot = dataFolder.toPath().resolve("nginxlinux").resolve("bin").resolve("nginx").normalize();
+        markExecutable(nginxRoot.resolve("sbin").resolve("nginx"));
+    }
+
+    public static void FilePermissionsGLIBC() {
+        FilePermissions(new File("plugins/webplugin"));
+    }
+
+    public static void FilePermissionsLIBZ() {
+        FilePermissions(new File("plugins/webplugin"));
+    }
+
+    public static void FilePermissionsLIBONIG() {
+        FilePermissions(new File("plugins/webplugin"));
+    }
+
+    public static void FolderPermissions() {
+        FolderPermissions(new File("plugins/webplugin"));
+    }
+
+    public static void FolderPermissions(File dataFolder) {
+        File phpFolder = dataFolder.toPath().resolve("php").toFile();
+        if (!phpFolder.exists()) {
+            return;
+        }
+        phpFolder.setReadable(true, false);
+        phpFolder.setWritable(true, true);
+        phpFolder.setExecutable(true, false);
+    }
+
+    private static void markExecutableRecursive(Path root) {
+        if (!Files.isDirectory(root)) {
+            return;
+        }
+        try (java.util.stream.Stream<Path> files = Files.walk(root)) {
+            files.filter(Files::isRegularFile).forEach(PhpInstaller::markExecutableIfNativeRuntimeFile);
+        } catch (IOException e) {
+            WPLogger.warn("Could not update permissions under " + root + ": " + e.getMessage());
         }
     }
-    public static void FilePermissionsNGINX(){
-        File php = new File("plugins/webplugin/nginxlinux/bin/nginx/sbin/nginx");
-        try {
-            php.setExecutable(true, false);
-            php.setReadable(true, false);
-            php.setWritable(true, false);
-            WPLogger.info("File permission check success!");
-        } catch (Exception e) {
-            DebugLogger.error(e.getMessage());
 
+    private static void markExecutableIfNativeRuntimeFile(Path path) {
+        String filename = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        if (filename.endsWith(".so") || filename.contains(".so.") || filename.startsWith("ld-linux")) {
+            markExecutable(path);
         }
     }
-    public static void FilePermissions(){
-        File php = new File("plugins/webplugin/phplinux/bin/php8/bin/php");
-        try {
-            php.setExecutable(true, false);
-            php.setReadable(true, false);
-            php.setWritable(true, false);
-            WPLogger.info("File permission check success!");
-            FilePermissionsfpm();
-        } catch (Exception e) {
-            DebugLogger.error(e.getMessage());
 
+    private static void markExecutable(Path path) {
+        File file = path.toFile();
+        if (!file.exists()) {
+            return;
         }
+        file.setExecutable(true, false);
+        file.setReadable(true, false);
     }
-    public static void FilePermissionsfpm(){
-        File php = new File("plugins/webplugin/phplinux/bin/php8/sbin/php-fpm");
-        try {
-            php.setExecutable(true, false);
-            php.setReadable(true, false);
-            php.setWritable(true, false);
-            WPLogger.info("File permission check success!");
-            FolderPermissions();
-        } catch (Exception e) {
-            DebugLogger.error(e.getMessage());
 
-        }
-    }
-    public static void FolderPermissions(){
-        try {
-            Process userProcess = Runtime.getRuntime().exec("whoami");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(userProcess.getInputStream()));
-            String currentUser = reader.readLine(); // Get the output (username)
-            reader.close();
-            String command = "chown -R " + currentUser + ": /home/container/plugins/webplugin/php";
-            Process chownProcess = Runtime.getRuntime().exec(command);
-            chownProcess.waitFor(); // Wait for the process to complete
-
-            System.out.println("Command executed successfully");
-
-        } catch (IOException | InterruptedException e) {
-            try {
-                String command = "chown -R www-data: /home/container/plugins/webplugin/php";
-                Process chownProcess = Runtime.getRuntime().exec(command);
-                chownProcess.waitFor(); // Wait for the process to complete
-
-                System.out.println("Command executed successfully");
-            } catch (Exception ex) {
-                DebugLogger.error(ex.getMessage());
-            }
-            DebugLogger.error(e.getMessage());
-        }
+    private static String defaultIfBlank(String value, String defaultValue) {
+        return value == null || value.trim().isEmpty() ? defaultValue : value.trim();
     }
 }

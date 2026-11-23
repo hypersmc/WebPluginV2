@@ -1,52 +1,67 @@
 # WebPluginV2
 
-WebPluginV2 is a powerful plugin designed for Minecraft servers, enhancing your server's capabilities with advanced web integration.
+WebPluginV2 is a source-available Minecraft plugin that provides an integrated web server for server environments. It includes HTML hosting and optional PHP/NGINX runtime support for supported platforms.
 
-## Features
+> Project status: this codebase is in cleanup/maintenance mode. The first priority is to make the build reproducible, reduce duplicated platform-specific code, and harden the embedded web server paths before larger feature work.
 
-- Seamless integration with Minecraft servers.
-- Advanced web functionalities for enhanced server management.
-- Open-source: You can view the source code and build it.
+## Supported platforms in the codebase
+
+- Bukkit/Paper/Folia-style servers through `plugin.yml`
+- BungeeCord through `bungee.yml`
+- Velocity through the Velocity `@Plugin` annotation
+
+## Requirements
+
+- Java JDK suitable for your target Minecraft server version
+- Maven 3.9+
+- A Minecraft server/proxy matching the API dependencies in `pom.xml`
+
+## Build
+
+```bash
+mvn clean package
+```
+
+The compiled plugin jar is written to `target/WebPlugin-<version>.jar`.
+
+For local development, you can optionally copy the built jar to a server plugin folder during `mvn install`:
+
+```bash
+mvn clean install -Dplugin.copy.dir=/path/to/server/plugins
+```
+
+## Development workflow
+
+1. Create a branch from `main` or `master`.
+2. Make one focused change at a time.
+3. Run `mvn -B -DskipTests package` before opening a pull request.
+4. Test on the platform touched by the change: Bukkit/Paper, BungeeCord, and/or Velocity.
+5. Update `CHANGELOG.md` for user-facing changes.
+
+See [`docs/VERSION_CONTROL.md`](docs/VERSION_CONTROL.md) for a suggested Git workflow.
+
+## Configuration
+
+Default config lives in `src/main/resources/config.yml`. Runtime config is created in the plugin data folder on first start.
+
+Important defaults:
+
+- HTML server port: `25567`
+- PHP server port: `25568`
+- Local PHP-FPM port: `25569`
+- PHP support is disabled by default
+- SSL support is disabled by default
+
+## Known cleanup areas
+
+See [`docs/PROJECT_AUDIT.md`](docs/PROJECT_AUDIT.md) for the initial audit notes. The highest-impact areas are:
+
+- Replace duplicated Bukkit/Bungee/Velocity web-serving classes with shared services.
+- Harden static-file serving against path traversal and missing-file edge cases.
+- Replace shell-string process execution with safer `ProcessBuilder` helpers.
+- Align runtime paths so plugin folder casing is consistent across Linux and Windows.
+- Decide whether the license should be open-source or source-available, then make README and license language match.
 
 ## License
 
-This plugin is released under the following license:
-
-**My License**
-
-This software is provided as is. While you have the freedom to view the source code and build it, you are not permitted to modify or copy the code for distribution.
-
-## Getting Started
-
-Follow these steps to get started with WebPluginV2 on your Minecraft server:
-
-1. Clone the repository: `git clone https://github.com/hypersmc/WebPluginV2.git`
-2. Build the plugin using your preferred build tool.
-3. Place the compiled JAR file into your server's plugins folder.
-4. Restart your Minecraft server.
-
-Alternatively, you can download the plugin from [SpigotMC](https://www.spigotmc.org/resources/webplugin-official-php-support-1-13-1-20-x.85640/), if you prefer not to build it yourself.
-
-## Contributing
-
-We welcome contributions from the community. If you find any issues or have suggestions for improvements, please open an issue or submit a pull request.
-
-## Support
-
-If you encounter any problems or have questions, feel free to reach out to us through the [issue tracker](https://github.com/hypersmc/WebPluginV2/issues).
-
-## License Details
-
-For more information on the licensing terms, please refer to the [LICENSE](LICENSE.md) file.
-
-## Acknowledgments
-
-Special thanks to [contributors](CONTRIBUTORS.md) who have helped make this project better.
-
-## Contact
-
-For inquiries, you can contact the project maintainer at [mhypers@gmail.com](mailto:mhypers@gmail.com).
-
-## Disclaimer
-
-This plugin is provided as is, and the maintainers are not responsible for any damages or issues caused by its use.
+See [`LICENSE.md`](LICENSE.md). The current license text is source-available and restricts modification/copying for distribution.

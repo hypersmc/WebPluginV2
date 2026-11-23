@@ -7,15 +7,13 @@
  *  * WebServer can not be copied and/or distributed without the express
  *  * permission of Jesper Henriksen
  *  ******************************************************
- */ 
+ */
 package me.jumpwatch.webserver;
 
 import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
 import me.jumpwatch.webserver.php.linux.PHPWebServer;
 import me.jumpwatch.webserver.php.linux.PhpInstaller;
-import me.jumpwatch.webserver.php.windows.WindowsPHPNginxCore;
-import me.jumpwatch.webserver.php.windows.installers.WinInstaller;
 import me.jumpwatch.webserver.utils.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -42,7 +40,7 @@ public class WebCore extends JavaPlugin {
     private boolean acceptorRunning;
     private ServerSocket ss;
     public static String ver;
-    private int version = 15;
+    private int version = 18;
     private CommandManager commandManager;
     public ContentTypeResolver resolver;
     final util util = new util();
@@ -108,7 +106,7 @@ public class WebCore extends JavaPlugin {
         if (!(new File(getDataFolder() + "/php/").exists())){
             setphpfiles();
         }
-        if (new File("plugins/WebPlugin/ssl/").exists()){
+        if (new File("plugins/webplugin/ssl/").exists()){
             logger.info("SSL Folder exist!");
         }else {
             logger.info("SSL Folder doesn't exist!");
@@ -120,18 +118,10 @@ public class WebCore extends JavaPlugin {
             }
         }
 
-        if (new File("plugins/WebPlugin/ssl/" + getConfig().getString("SSLJKSName") + ".jks").exists()){
+        if (new File("plugins/webplugin/ssl/" + getConfig().getString("SSLJKSName") + ".jks").exists()){
             logger.info("SSL File exist!");
         } else {
             logger.info("SSL File doesn't exist!");
-        }
-
-        if (CheckOS.isWindows()) {
-            if (new File("plugins/WebPlugin/phpwindows").exists() && new File("plugins/WebPlugin/phpwindows/php").exists() && new File("plugins/WebPlugin/phpwindows/nginx").exists()) {
-                logger.info("Core Windows PHP files exist!");
-            } else {
-                logger.info("Windows php feature have been disabled until it is fixed!");
-            }
         }
         if (getConfig().isSet("Settings.HTMLPORT")) {
             try {
@@ -157,7 +147,6 @@ public class WebCore extends JavaPlugin {
         }
         if (CheckOS.isWindows()) {
             Startwebserverhtml();
-            logger.info("Windows php feature have been disabled until it is fixed!");
         }
         if (CheckOS.isUnix()) {
             Startwebserverhtml();
@@ -244,34 +233,29 @@ public class WebCore extends JavaPlugin {
             e.printStackTrace();
         }
         if (getConfig().getBoolean("Settings.EnablePHP")) {
-            if (CheckOS.isWindows()) {
-                WindowsPHPNginxCore.StopWindowsNginxandPHP();
-            }else if (CheckOS.isUnix()) {
+            if (CheckOS.isUnix()) {
 
             }
         }
 
     }
-    private void Startwebserverphp(){
-        if (getConfig().getBoolean("Settings.EnablePHP")) {
-            new BukkitRunnable() {
-                @Override
-                public void run(){
-                    WindowsPHPNginxCore.StartWindowsNginxandPHP();
-                }
-            }.runTaskAsynchronously(this);
 
-        }
-    }
     private void StartwebserverphpLinux(){
         if (getConfig().getBoolean("Settings.EnablePHP")){
-            if (!new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
-                PhpInstaller.installphp();
-                PhpInstaller.FilePermissions(); //Extra check as you never know :)
-                if (new File("plugins/webplugin/phplinux/bin/php8/bin/php").exists()) {
+            File phpBinary = new File(getDataFolder(), "phplinux/bin/php8/bin/php");
+            if (!phpBinary.exists()) {
+                boolean installed = PhpInstaller.installphp(
+                        getDataFolder(),
+                        getConfig().getString("GithubWebPluginPHPRepo"),
+                        getConfig().getString("GithubWebPluginPHPRepoFilename"),
+                        getConfig().getString("GithubWebPluginNGINXRepoFilename"),
+                        getConfig().getBoolean("Settings.debug")
+                );
+                if (installed && phpBinary.exists()) {
                     new PHPWebServer(this).start();
                 }
             } else {
+                PhpInstaller.FilePermissions(getDataFolder());
                 new PHPWebServer(this).start();
             }
         }
@@ -329,10 +313,6 @@ public class WebCore extends JavaPlugin {
         commandManager.register("stopweb", ((sender, params) -> {
             if (sender.hasPermission("web.stop") || sender.hasPermission("web.*")) {
                 if (getConfig().getBoolean("Settings.EnablePHP")) {
-                    if (CheckOS.isWindows()) {
-                        WindowsPHPNginxCore.StopWindowsNginxandPHP();
-                        sender.sendMessage(prefix + " Stopped Windows webserver (PHP)");
-                    }
                     if (CheckOS.isUnix()) {
                         sender.sendMessage(prefix + " Stopping PHP webserver on linux is no longer possible.");
                     }
@@ -345,10 +325,6 @@ public class WebCore extends JavaPlugin {
         commandManager.register("startweb", ((sender, params) -> {
             if (sender.hasPermission("web.start") || sender.hasPermission("web.*")) {
                 if (getConfig().getBoolean("Settings.EnablePHP")) {
-                    if (CheckOS.isWindows()) {
-                        WindowsPHPNginxCore.StartWindowsNginxandPHP();
-                        sender.sendMessage(prefix + " Started Windows webserver (PHP)");
-                    }
                     if (CheckOS.isUnix()) {
                         sender.sendMessage(prefix + " Linux php webserver will automatically start itself.");
                     }
@@ -361,10 +337,6 @@ public class WebCore extends JavaPlugin {
         commandManager.register("webreload", ((sender, params) -> {
             if (sender.hasPermission("web.webreload") || sender.hasPermission("web.*")) {
                 if (getConfig().getBoolean("Settings.EnablePHP")) {
-                    if (CheckOS.isWindows()) {
-                        WindowsPHPNginxCore.reloadWindowsNginxandPHP();
-                        sender.sendMessage(prefix + " Reloaded Windows webserver (PHP)");
-                    }
                     if (CheckOS.isUnix()) {
                         sender.sendMessage(prefix + " Reload not possible anymore on Linux webserver (PHP)");
                     }
