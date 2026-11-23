@@ -26,6 +26,17 @@
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <!-- Native executables are binary: do NOT pass through Maven's UTF-8 filtering. -->
+                <excludes>
+                    <exclude>native/**</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>native/**</include>
+                </includes>
             </resource>
         </resources>
         <plugins>
