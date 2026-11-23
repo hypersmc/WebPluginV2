@@ -123,6 +123,8 @@ public class WebCore extends JavaPlugin {
         } else {
             logger.info("SSL File doesn't exist!");
         }
+        // The Java HTML listener is independent of PHP/NGINX and uses HTMLPORT only without SSL.
+        if (getConfig().getBoolean("Settings.EnableHTML") && !getConfig().getBoolean("SSLSettings.EnableSSL")) {
         if (getConfig().isSet("Settings.HTMLPORT")) {
             try {
                 listeningport = getConfig().getInt("Settings.HTMLPORT");
@@ -144,6 +146,7 @@ public class WebCore extends JavaPlugin {
                 Bukkit.getPluginManager().disablePlugin(this);
                 return;
             }
+        }
         }
         if (CheckOS.isWindows()) {
             Startwebserverhtml();
@@ -216,21 +219,10 @@ public class WebCore extends JavaPlugin {
         }
         this.shutdown = true;
         acceptorRunning = false;
-        Socket sockCloser;
-        try {
-            sockCloser = new Socket("localhost", listeningport);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sockCloser.getOutputStream()));
-            out.write(this.closeConnection);
-            out.close();
-            sockCloser.close();
-            getLogger().info( "Closed listening web server successfully!");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            ss.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (ss != null) {
+            try { ss.close(); } catch (IOException e) {
+                getLogger().warning("Could not close HTML listener: " + e.getMessage());
+            } finally { ss = null; }
         }
         if (getConfig().getBoolean("Settings.EnablePHP")) {
             if (CheckOS.isUnix()) {
@@ -261,6 +253,15 @@ public class WebCore extends JavaPlugin {
         }
     }
     private void Startwebserverhtml(){
+        if (!getConfig().getBoolean("Settings.EnableHTML")) {
+            acceptorRunning = false;
+            getLogger().info("Standalone HTML web server is disabled (Settings.EnableHTML=false).");
+            return;
+        }
+        if (!getConfig().getBoolean("SSLSettings.EnableSSL") && ss == null) {
+            getLogger().severe("Standalone HTML listener cannot start because HTMLPORT was not bound.");
+            return;
+        }
         acceptorRunning = true;
         if (getConfig().getBoolean("Settings.EnableHTML")) {
             if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
@@ -281,7 +282,7 @@ public class WebCore extends JavaPlugin {
                                 sock = ss.accept();
                                 new NoneSSLHtml(sock, m).start();
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                if (getAcceptorRunning()) getLogger().warning("HTML accept failed: " + e.getMessage());
                             }
                         }
                     }

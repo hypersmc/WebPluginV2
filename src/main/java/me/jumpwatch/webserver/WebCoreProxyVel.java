@@ -84,26 +84,15 @@ public class WebCoreProxyVel  {
         boolean enableHTML = (Boolean) settings.get("EnableHTML");
         boolean enablePHP = (Boolean) settings.get("EnablePHP");
 //        scheduledTask.cancel();
-        if (enableSSL) scheduledTaskSSL.cancel();
-        if (enableHTML) acceptorTask.cancel();
+        if (scheduledTaskSSL != null) scheduledTaskSSL.cancel();
+        if (acceptorTask != null) acceptorTask.cancel();
         if (enablePHP) new PHPWebServerVel(this).stopsystem();
         this.shutdown = true;
         acceptorRunning = false;
-        Socket sockCloser;
-        try {
-            sockCloser = new Socket("localhost", listeningport);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sockCloser.getOutputStream()));
-            out.write(this.closeConnection);
-            out.close();
-            sockCloser.close();
-            getLogger().info( "Closed listening web server successfully!");
-        }catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            ss.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (ss != null) {
+            try { ss.close(); } catch (IOException e) {
+                logger.warning("Could not close HTML listener: " + e.getMessage());
+            } finally { ss = null; }
         }
         //No php yet
 
@@ -157,6 +146,8 @@ public class WebCoreProxyVel  {
         if (CheckOS.isWindows()) {
             logger.severe("Windows is not supported!");
         }
+        // Do not bind HTMLPORT unless the standalone non-SSL HTML listener is actually enabled.
+        if (asBoolean(settings.get("EnableHTML"), false) && !asBoolean(sslSettings.get("EnableSSL"), false)) {
         if (settings.get("HTMLPORT") != null){
             try {
                 listeningport = (int) settings.get("HTMLPORT");
@@ -174,6 +165,7 @@ public class WebCoreProxyVel  {
                     e.printStackTrace();
                 }
             }
+        }
         }
         if (CheckOS.isWindows()){
             Startwebserverhtml();
@@ -342,8 +334,17 @@ public class WebCoreProxyVel  {
     }
 
     private void Startwebserverhtml(){
+        boolean enableHTML = asBoolean(settings.get("EnableHTML"), false);
+        if (!enableHTML) {
+            acceptorRunning = false;
+            logger.info("Standalone HTML web server is disabled (Settings.EnableHTML=false).");
+            return;
+        }
+        if (!asBoolean(sslSettings.get("EnableSSL"), false) && ss == null) {
+            logger.severe("Standalone HTML listener cannot start because HTMLPORT was not bound.");
+            return;
+        }
         acceptorRunning = true;
-        boolean enableHTML = (Boolean) settings.get("EnableHTML");
         boolean enableSSL = (Boolean) sslSettings.get("EnableSSL");
         if (enableHTML){
             if (enableSSL){
@@ -360,8 +361,8 @@ public class WebCoreProxyVel  {
                                 Socket sock = ss.accept();
                                 new NoneSSLHtmlProxyVel(sock, m).start();
                             } catch (IOException e) {
-                                logger.severe("Error accepting socket connection");
-                                if (debug) e.printStackTrace();
+                                if (acceptorRunning) logger.severe("HTML accept failed: " + e.getMessage());
+                                if (acceptorRunning && debug) e.printStackTrace();
                             }
                         }
                     } catch (Exception e) {

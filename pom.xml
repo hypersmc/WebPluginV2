@@ -6,7 +6,7 @@
 
     <groupId>org.WebPlugin</groupId>
     <artifactId>WebPlugin</artifactId>
-    <version>4.1R</version>
+    <version>4.2B</version>
     <name>WebPlugin</name>
     <description>Integrated HTML/PHP web server plugin for Minecraft server platforms.</description>
 

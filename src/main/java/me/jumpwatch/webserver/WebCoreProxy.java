@@ -90,6 +90,8 @@ public class WebCoreProxy extends Plugin {
         if (CheckOS.isWindows()) {
             logger.severe("Windows is not supported!");
         }
+        // Do not reserve an HTML port when the standalone HTML listener is disabled or using SSL.
+        if (configuration.getBoolean("Settings.EnableHTML") && !configuration.getBoolean("SSLSettings.EnableSSL")) {
         if (configuration.getString("Settings.HTMLPORT") != null){
             try {
                 listeningport = (int) configuration.getInt("Settings.HTMLPORT");
@@ -108,6 +110,7 @@ public class WebCoreProxy extends Plugin {
                 }
             }
         }
+        }
         if (CheckOS.isWindows()){
             Startwebserverhtml();
         }
@@ -122,7 +125,13 @@ public class WebCoreProxy extends Plugin {
 
     @Override
     public void onDisable() {
-
+        shutdown = true;
+        acceptorRunning = false;
+        if (ss != null) {
+            try { ss.close(); } catch (IOException e) {
+                logger.warning("Could not close HTML listener: " + e.getMessage());
+            } finally { ss = null; }
+        }
     }
 
     public void makeConfig() throws IOException {
@@ -177,8 +186,17 @@ public class WebCoreProxy extends Plugin {
         }
     }
     private void Startwebserverhtml(){
+        boolean enableHTML = configuration.getBoolean("Settings.EnableHTML");
+        if (!enableHTML) {
+            acceptorRunning = false;
+            logger.info("Standalone HTML web server is disabled (Settings.EnableHTML=false).");
+            return;
+        }
+        if (!configuration.getBoolean("SSLSettings.EnableSSL") && ss == null) {
+            logger.severe("Standalone HTML listener cannot start because HTMLPORT was not bound.");
+            return;
+        }
         acceptorRunning = true;
-        boolean enableHTML = (Boolean) configuration.getBoolean("Settings.EnableHTML");
         boolean enableSSL = (Boolean) configuration.getBoolean("SSLSettings.EnableSSL");
         if (enableHTML){
             if (enableSSL){
@@ -194,7 +212,7 @@ public class WebCoreProxy extends Plugin {
                                 Socket socket = ss.accept();
                                 new NoneSSLHtmlProxyBun(socket, m).start();
                             } catch (IOException e) {
-                                logger.severe("Error accepting socket connection");
+                                if (acceptorRunning) logger.severe("Error accepting socket connection: " + e.getMessage());
                             }
                         }
                     } catch (Exception e) {
