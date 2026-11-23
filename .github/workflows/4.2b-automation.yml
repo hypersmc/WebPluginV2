@@ -1,0 +1,44 @@
+name: WebPlugin 4.2B automation checks
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [feature/4.2r-sandbox-supervisor]
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Compile and package the actual plugin
+        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Compile isolated automation tests
+        run: |
+          mkdir -p target/automation-smoke
+          javac -cp target/classes -d target/automation-smoke \
+            src/test/java/me/jumpwatch/webserver/automation/ProcessSupervisorSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/TaskEngineSmokeTest.java
+      - name: Run process supervisor smoke test
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.ProcessSupervisorSmokeTest
+      - name: Run deployment task persistence smoke test
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.TaskEngineSmokeTest
+      - name: Build and probe native Landlock helper
+        run: |
+          gcc -std=gnu11 -O2 -Wall -Wextra -o target/webplugin-landlock native/webplugin-landlock.c
+          set +e
+          target/webplugin-landlock --probe
+          rc=$?
+          set -e
+          case "$rc" in
+            0|10|11|12) echo "Supported/unavailable host result ($rc)";;
+            *) echo "Landlock probe unexpectedly failed with $rc"; exit 1;;
+          esac
