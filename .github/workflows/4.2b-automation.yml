@@ -24,7 +24,10 @@ jobs:
           mkdir -p target/automation-smoke
           javac -cp target/classes -d target/automation-smoke \
             src/test/java/me/jumpwatch/webserver/automation/ProcessSupervisorSmokeTest.java \
-            src/test/java/me/jumpwatch/webserver/automation/TaskEngineSmokeTest.java
+            src/test/java/me/jumpwatch/webserver/automation/TaskEngineSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/LandlockSandboxSmokeTest.java
+      - name: Test Landlock fallback policy
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.LandlockSandboxSmokeTest
       - name: Run process supervisor smoke test
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.ProcessSupervisorSmokeTest
       - name: Run deployment task persistence smoke test
@@ -37,6 +40,15 @@ jobs:
           rc=$?
           set -e
           case "$rc" in
-            0|10|11|12) echo "Supported/unavailable host result ($rc)";;
+            0)
+              echo "Landlock available: checking actual filesystem enforcement"
+              gcc -std=gnu11 -O2 -Wall -Wextra -o target/landlock-enforcement-test src/test/native/landlock-enforcement-test.c
+              tmp=$(mktemp -d)
+              mkdir -p "$tmp/site"
+              printf 'minecraft-sensitive' > "$tmp/minecraft-secret"
+              target/webplugin-landlock --rx /usr --rx /bin --rx /lib --rx /lib64 --rx "$PWD/target" --rw "$tmp/site" -- \
+                "$PWD/target/landlock-enforcement-test" "$tmp/site/allowed" "$tmp/minecraft-secret"
+              ;;
+            10|11|12) echo "Landlock unavailable on runner ($rc); sandbox enforcement test skipped";;
             *) echo "Landlock probe unexpectedly failed with $rc"; exit 1;;
           esac
