@@ -77,9 +77,14 @@ public final class LandlockSandbox {
             // Compatibility profile: NGINX keeps its own logs, PID and temp files in this root.
             addIfExists(rw, nginxRuntime);
         } else {
-            // PHP-FPM and Laravel CLI need normal write access inside the site directory.
+            // PHP-FPM needs to write Laravel storage/ and bootstrap/cache/, which may
+            // be siblings of NGINX's public/ document root. For the compatibility profile,
+            // allow the WebPlugin data tree, but never the whole Minecraft server root.
             addIfExists(rw, websiteRoot);
-            if (role == Role.PHP_FPM) addIfExists(rw, phpRuntime);
+            if (role == Role.PHP_FPM) {
+                addIfExists(rw, pluginData);
+                addIfExists(rw, phpRuntime);
+            }
         }
         for (Path p : rx) { command.add("--rx"); command.add(p.toString()); }
         for (Path p : ro) { command.add("--ro"); command.add(p.toString()); }
