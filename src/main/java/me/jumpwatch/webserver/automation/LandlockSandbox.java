@@ -34,7 +34,7 @@ public final class LandlockSandbox {
         this.availability = probe.availability;
         this.probeDetail = probe.detail;
         logger.accept("Landlock: " + availability + " (" + probeDetail + "), enabled=" + enabled + ", mode=" + mode);
-        if (!enabled) logger.accept("Landlock is recommended for WebPlugin. Enable Security.Landlock.Enabled after installing the helper.");
+        if (!enabled) logger.accept("Landlock is recommended for WebPlugin. Set Security.Landlock.Enabled: true when ready.");
         else if (availability != Availability.AVAILABLE) logger.accept("WARNING: Landlock is enabled but unavailable; " +
                 (mode == Mode.REQUIRED ? "affected web processes will not launch" : "preferred mode will use unsandboxed compatibility fallback"));
     }
@@ -111,10 +111,14 @@ public final class LandlockSandbox {
     }
 
     private static Probe probe(Path helper) {
-        if (!Files.isRegularFile(helper) || !Files.isExecutable(helper))
-            return new Probe(Availability.NO_HELPER, "helper missing/not executable: " + helper);
         if (!System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("linux"))
             return new Probe(Availability.UNSUPPORTED, "not Linux");
+        if (!Files.exists(helper))
+            return new Probe(Availability.NO_HELPER, "helper file does not exist: " + helper);
+        if (!Files.isRegularFile(helper))
+            return new Probe(Availability.NO_HELPER, "helper is not a regular file: " + helper);
+        if (!Files.isExecutable(helper))
+            return new Probe(Availability.NO_HELPER, "helper exists but is not executable: " + helper);
         try {
             Process process = new ProcessBuilder(helper.toString(), "--probe")
                     .redirectErrorStream(true).start();

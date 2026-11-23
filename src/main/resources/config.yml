@@ -86,7 +86,8 @@ Settings:
   denyNginxConfigOverride: false
 
 # ── Optional Linux filesystem sandbox (WebPlugin-wide) ──
-# The bundled C launcher can sandbox PHP-FPM, NGINX and deployment commands.
+# The JAR bundles the Linux x86-64 helper and installs it automatically on startup.
+# The C launcher can sandbox PHP-FPM, NGINX and deployment commands.
 # The Minecraft JVM / standalone Java HTML listener cannot be Landlocked separately.
 # Check support at boot; on unsupported hosts "preferred" warns and continues.
 # "required" prevents affected native launches when isolation cannot be enforced.
@@ -94,7 +95,7 @@ Security:
   Landlock:
     Enabled: false                 # Highly recommended when supported.
     Mode: preferred                # preferred | required
-    HelperPath: ""                 # "" = plugins/webplugin/bin/webplugin-landlock
+    HelperPath: ""                 # "" = automatically install/use plugins/webplugin/bin/webplugin-landlock
 
 # ── Concurrent PHP CLI tasks / long-running workers (4.2B beta) ──
 # Requires Settings.EnablePHP=true and an installed modular PHP runtime.

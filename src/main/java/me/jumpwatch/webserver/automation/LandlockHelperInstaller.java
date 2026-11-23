@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Deploys the signed-in-build Linux helper embedded inside the WebPlugin JAR.
+ * Deploys the CI-built Linux helper embedded inside the WebPlugin JAR.
  * Only the default plugin-managed location is modified; custom paths stay untouched.
  * No native build tools or external network access are required on the server.
  */
