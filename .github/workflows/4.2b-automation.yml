@@ -3,8 +3,6 @@ name: WebPlugin 4.2B automation checks
 on:
   pull_request:
     branches: [master]
-  push:
-    branches: [feature/4.2r-sandbox-supervisor]
 
 permissions:
   contents: read
