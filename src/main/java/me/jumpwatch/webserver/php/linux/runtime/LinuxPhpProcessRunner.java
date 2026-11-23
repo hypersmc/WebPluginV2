@@ -1,6 +1,7 @@
 package me.jumpwatch.webserver.php.linux.runtime;
 
 import me.jumpwatch.webserver.utils.WPLogger;
+import me.jumpwatch.webserver.automation.LandlockSandbox;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,17 +29,53 @@ import java.util.StringJoiner;
 public final class LinuxPhpProcessRunner {
     private final LinuxPhpRuntimeOptions options;
     private final LinuxPhpRuntimePaths paths;
+    private final LandlockSandbox sandbox;
+    private final Path websiteRoot;
+    private static final Object PHP_INI_LOCK = new Object();
 
     public LinuxPhpProcessRunner(LinuxPhpRuntimeOptions options) {
+        this(options, null, null);
+    }
+
+    public LinuxPhpProcessRunner(LinuxPhpRuntimeOptions options, LandlockSandbox sandbox, Path websiteRoot) {
         this.options = options;
         this.paths = new LinuxPhpRuntimePaths(options);
+        this.sandbox = sandbox;
+        this.websiteRoot = websiteRoot;
+    }
+
+    /** Build a PHP CLI invocation using exactly the same extensions and native loader as PHP-FPM. */
+    public ProcessBuilder buildPhpCliCommand(Path workingDirectory, List<String> arguments) throws IOException {
+        if (!Files.isRegularFile(paths.phpCliExecutable()))
+            throw new IOException("Bundled PHP CLI not found: " + paths.phpCliExecutable());
+        PhpRuntimeManifest manifest = PhpRuntimeManifest.load(paths.phpRoot());
+        Map<String, PhpExtensionPack> packs = PhpExtensionPack.discover(manifest.extensionPacksRoot(paths.phpRoot()));
+        List<String> extensions = resolveEnabledExtensions();
+        Path ini;
+        synchronized (PHP_INI_LOCK) { ini = writeGeneratedPhpIni(extensions, packs); }
+        List<String> libraries = buildLibraryPathEntries(extensions, packs, manifest);
+        List<String> command = bundledRuntimeCommand(paths.phpCliExecutable(), libraries);
+        command.add("-c");
+        command.add(ini.toString());
+        command.addAll(arguments);
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDirectory.toFile());
+        putLibraryPath(builder, libraries);
+        return builder;
+    }
+
+    /** Landlock is restricted to subprocesses, not to the Minecraft JVM. */
+    private ProcessBuilder protect(ProcessBuilder builder, LandlockSandbox.Role role) throws IOException {
+        return sandbox == null ? builder : sandbox.protect(builder, role,
+                paths.dataRoot(), websiteRoot, paths.phpRoot(), paths.nginxRoot());
     }
 
     public int startPhpFpm() throws IOException, InterruptedException {
         PhpRuntimeManifest manifest = PhpRuntimeManifest.load(paths.phpRoot());
         Map<String, PhpExtensionPack> extensionPacks = PhpExtensionPack.discover(manifest.extensionPacksRoot(paths.phpRoot()));
         List<String> enabledExtensions = resolveEnabledExtensions();
-        Path phpIni = writeGeneratedPhpIni(enabledExtensions, extensionPacks);
+        Path phpIni;
+        synchronized (PHP_INI_LOCK) { phpIni = writeGeneratedPhpIni(enabledExtensions, extensionPacks); }
         List<String> libraryPaths = buildLibraryPathEntries(enabledExtensions, extensionPacks, manifest);
 
         logRuntimeSummary(manifest, enabledExtensions, extensionPacks);
@@ -57,7 +94,7 @@ public final class LinuxPhpProcessRunner {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(paths.phpFpmExecutable().getParent().toFile());
         putLibraryPath(builder, libraryPaths);
-        return runAndLog("php-fpm", builder);
+        return runAndLog("php-fpm", protect(builder, LandlockSandbox.Role.PHP_FPM));
     }
 
     public int startNginx() throws IOException, InterruptedException {
@@ -72,7 +109,7 @@ public final class LinuxPhpProcessRunner {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(paths.nginxExecutable().getParent().toFile());
         putLibraryPath(builder, libraryPaths);
-        return runAndLog("nginx", builder);
+        return runAndLog("nginx", protect(builder, LandlockSandbox.Role.NGINX));
     }
 
     public LinuxPhpRuntimePaths paths() {
@@ -226,7 +263,7 @@ public final class LinuxPhpProcessRunner {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(paths.phpCliExecutable().getParent().toFile());
         putLibraryPath(builder, libraryPaths);
-        CommandResult result = runAndCapture(builder);
+        CommandResult result = runAndCapture(protect(builder, LandlockSandbox.Role.TASK));
         if (result.exitCode != 0) {
             throw new IOException("PHP runtime preflight failed with exit code " + result.exitCode + ":\n" + result.output);
         }
