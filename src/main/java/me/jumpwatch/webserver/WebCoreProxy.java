@@ -113,6 +113,23 @@ public class WebCoreProxy extends Plugin {
             }
         }
         }
+        // Same shared task engine as Bukkit and Velocity; no arbitrary command execution.
+        ProxyServer.getInstance().getPluginManager().registerCommand(this,
+                new net.md_5.bungee.api.plugin.Command("webptasks", "webplugin.tasks") {
+                    @Override
+                    public void execute(net.md_5.bungee.api.CommandSender sender, String[] args) {
+                        if (!sender.hasPermission("webplugin.tasks")) {
+                            sender.sendMessage(new net.md_5.bungee.api.chat.TextComponent("[WebPlugin] No permission."));
+                            return;
+                        }
+                        if (automation == null) {
+                            sender.sendMessage(new net.md_5.bungee.api.chat.TextComponent("[WebPlugin] Automation not initialized."));
+                            return;
+                        }
+                        for (String line : automation.command(java.util.Arrays.asList(args)))
+                            sender.sendMessage(new net.md_5.bungee.api.chat.TextComponent("[WebPlugin] " + line));
+                    }
+                });
         boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()){
             Startwebserverhtml();
