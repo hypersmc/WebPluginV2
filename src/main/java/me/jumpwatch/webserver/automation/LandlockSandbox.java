@@ -65,7 +65,11 @@ public final class LandlockSandbox {
         Set<Path> rw = new LinkedHashSet<>();
         for (String path : new String[]{"/lib", "/lib64", "/usr", "/bin", "/sbin"}) addIfExists(rx, Path.of(path));
         for (String path : new String[]{"/etc/ssl", "/etc/hosts", "/etc/resolv.conf", "/etc/nsswitch.conf",
-                "/etc/localtime", "/dev/urandom", "/dev/null", "/proc/self"}) addIfExists(ro, Path.of(path));
+                "/etc/localtime", "/dev/urandom", "/proc/self"}) addIfExists(ro, Path.of(path));
+        // PHP-FPM opens /dev/null O_RDWR when initializing stdio; read-only
+        // permissions cause startup failure (FPM exit 78). This is a single
+        // character device, not permission to write anywhere in /dev.
+        addIfExists(rw, Path.of("/dev/null"));
         addIfExists(rx, phpRuntime);
         addIfExists(rx, nginxRuntime);
         // Read plugin-managed web configuration and certificates, but do not grant
