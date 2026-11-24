@@ -17,19 +17,13 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Build the bundled static Linux amd64 Landlock helper
-        run: |
-          mkdir -p src/main/resources/native/linux-amd64
-          gcc -std=gnu11 -static -O2 -Wall -Wextra -o src/main/resources/native/linux-amd64/webplugin-landlock native/webplugin-landlock.c
-          chmod 0755 src/main/resources/native/linux-amd64/webplugin-landlock
-          sha256sum src/main/resources/native/linux-amd64/webplugin-landlock
-      - name: Compile and package the actual plugin
-        run: mvn --batch-mode --no-transfer-progress -DskipTests package
+      - name: Compile and package plugin + native helper using Maven
+        run: mvn --batch-mode --no-transfer-progress -DskipTests clean package
       - name: Verify helper is embedded in the plugin JAR
         run: |
           jar tf target/WebPlugin-4.2B.jar | grep -Fx 'native/linux-amd64/webplugin-landlock'
           unzip -p target/WebPlugin-4.2B.jar native/linux-amd64/webplugin-landlock | sha256sum
-          test "$(unzip -p target/WebPlugin-4.2B.jar native/linux-amd64/webplugin-landlock | sha256sum | cut -d' ' -f1)" = "$(sha256sum src/main/resources/native/linux-amd64/webplugin-landlock | cut -d' ' -f1)"
+          test "$(unzip -p target/WebPlugin-4.2B.jar native/linux-amd64/webplugin-landlock | sha256sum | cut -d' ' -f1)" = "$(sha256sum target/generated-resources/native/linux-amd64/webplugin-landlock | cut -d' ' -f1)"
       - name: Compile isolated automation tests
         run: |
           mkdir -p target/automation-smoke
@@ -48,7 +42,7 @@ jobs:
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.TaskEngineSmokeTest
       - name: Build and probe native Landlock helper
         run: |
-          cp src/main/resources/native/linux-amd64/webplugin-landlock target/webplugin-landlock
+          cp target/generated-resources/native/linux-amd64/webplugin-landlock target/webplugin-landlock
           sha256sum target/webplugin-landlock
           set +e
           target/webplugin-landlock --probe
