@@ -38,6 +38,14 @@
                     <include>native/**</include>
                 </includes>
             </resource>
+            <!-- The executable is built during generate-resources, not checked in. -->
+            <resource>
+                <directory>${project.build.directory}/generated-resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>native/**</include>
+                </includes>
+            </resource>
         </resources>
         <plugins>
             <plugin>
@@ -185,6 +193,43 @@
     </dependencies>
 
     <profiles>
+        <!-- A local Linux IDE build should produce the exact same self-contained
+             JAR as CI. Other OS/CPU combinations retain their normal Java build,
+             but cannot embed an x86-64 Linux executable without cross-compiling. -->
+        <profile>
+            <id>linux-amd64-landlock</id>
+            <activation>
+                <os>
+                    <name>Linux</name>
+                    <arch>amd64</arch>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.5.1</version>
+                        <executions>
+                            <execution>
+                                <id>compile-bundled-landlock-helper</id>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>sh</executable>
+                                    <arguments>
+                                        <argument>${project.basedir}/scripts/build-landlock-helper.sh</argument>
+                                        <argument>${project.build.directory}/generated-resources/native/linux-amd64/webplugin-landlock</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>local-copy</id>
             <activation>
