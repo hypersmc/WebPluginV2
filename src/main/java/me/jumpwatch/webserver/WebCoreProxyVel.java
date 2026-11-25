@@ -9,6 +9,7 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.scheduler.ScheduledTask;
 import me.jumpwatch.webserver.html.NoneSSLHtmlProxyVel;
 import me.jumpwatch.webserver.php.linux.PhpInstaller;
+import me.jumpwatch.webserver.automation.WebPluginAutomation;
 import me.jumpwatch.webserver.php.linux.PHPWebServerVel;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.ContentTypeResolver;
@@ -33,11 +34,12 @@ import java.util.logging.Logger;
  * @Project WebPluginV2
  * v1.0.0
  */
-@Plugin(id= "webplugin", name = "webplugin", version = "4.0R", authors = "JumpWatch, HypersMC, HumpJump")
+@Plugin(id= "webplugin", name = "webplugin", version = "4.2B", authors = "JumpWatch, HypersMC, HumpJump")
 public class WebCoreProxyVel  {
     private static final org.slf4j.Logger log = LoggerFactory.getLogger(WebCoreProxyVel.class);
-    public String pluginversion = "4.0R";
+    public String pluginversion = "4.2B";
     public static String closeConnection = "!Close Connection!";
+    public WebPluginAutomation automation;
     private int listeningport;
     private int portphp;
     private WebCoreProxyVel m = this;
@@ -80,30 +82,20 @@ public class WebCoreProxyVel  {
     @Subscribe
     public void onProxyShutdown(ProxyShutdownEvent event) {
         logger.info("WebCoreProxyVel is shutting down.");
+        if (automation != null) { automation.close(); automation = null; }
         boolean enableSSL = (Boolean) sslSettings.get("EnableSSL");
         boolean enableHTML = (Boolean) settings.get("EnableHTML");
         boolean enablePHP = (Boolean) settings.get("EnablePHP");
 //        scheduledTask.cancel();
-        if (enableSSL) scheduledTaskSSL.cancel();
-        if (enableHTML) acceptorTask.cancel();
+        if (scheduledTaskSSL != null) scheduledTaskSSL.cancel();
+        if (acceptorTask != null) acceptorTask.cancel();
         if (enablePHP) new PHPWebServerVel(this).stopsystem();
         this.shutdown = true;
         acceptorRunning = false;
-        Socket sockCloser;
-        try {
-            sockCloser = new Socket("localhost", listeningport);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sockCloser.getOutputStream()));
-            out.write(this.closeConnection);
-            out.close();
-            sockCloser.close();
-            getLogger().info( "Closed listening web server successfully!");
-        }catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            ss.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (ss != null) {
+            try { ss.close(); } catch (IOException e) {
+                logger.warning("Could not close HTML listener: " + e.getMessage());
+            } finally { ss = null; }
         }
         //No php yet
 
@@ -157,6 +149,8 @@ public class WebCoreProxyVel  {
         if (CheckOS.isWindows()) {
             logger.severe("Windows is not supported!");
         }
+        // Do not bind HTMLPORT unless the standalone non-SSL HTML listener is actually enabled.
+        if (asBoolean(settings.get("EnableHTML"), false) && !asBoolean(sslSettings.get("EnableSSL"), false)) {
         if (settings.get("HTMLPORT") != null){
             try {
                 listeningport = (int) settings.get("HTMLPORT");
@@ -175,12 +169,33 @@ public class WebCoreProxyVel  {
                 }
             }
         }
+        }
+        proxyServer.getCommandManager().register(
+                proxyServer.getCommandManager().metaBuilder("webptasks").plugin(this).build(),
+                new com.velocitypowered.api.command.SimpleCommand() {
+                    @Override public void execute(Invocation invocation) {
+                        if (!invocation.source().hasPermission("webplugin.tasks")) {
+                            invocation.source().sendMessage(net.kyori.adventure.text.Component.text("[WebPlugin] No permission."));
+                            return;
+                        }
+                        if (automation == null) {
+                            invocation.source().sendMessage(net.kyori.adventure.text.Component.text("[WebPlugin] Automation not initialized."));
+                            return;
+                        }
+                        for (String line : automation.command(java.util.Arrays.asList(invocation.arguments())))
+                            invocation.source().sendMessage(net.kyori.adventure.text.Component.text("[WebPlugin] " + line));
+                    }
+                });
+        boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()){
             Startwebserverhtml();
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
-            StartwebserverphpLinux();
+            if (automationReady) {
+                StartwebserverphpLinux();
+                if (automation != null && asBoolean(settings.get("EnablePHP"), false)) automation.startTasksIfReady();
+            }
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
                 logger.info("It's recommended to run minecraft servers in docker containers.");
@@ -301,6 +316,49 @@ public class WebCoreProxyVel  {
             logger.severe("Failed to save resource " + resourcePath);
         }
     }
+    private Object automationSetting(String path, Object fallback) {
+        Object value = config;
+        for (String part : path.split("\\.")) {
+            if (!(value instanceof java.util.Map<?, ?>)) return fallback;
+            value = ((java.util.Map<?, ?>) value).get(part);
+        }
+        return value == null ? fallback : value;
+    }
+
+    private boolean initializeAutomation() {
+        if (!CheckOS.isUnix()) return true;
+        try {
+            Object raw = automationSetting("DeploymentTasks.Tasks", java.util.List.of());
+            java.util.List<java.util.Map<?, ?>> taskConfigs = new java.util.ArrayList<>();
+            if (raw instanceof java.util.List<?>) {
+                for (Object entry : (java.util.List<?>) raw)
+                    if (entry instanceof java.util.Map<?, ?>)
+                        taskConfigs.add((java.util.Map<?, ?>) entry);
+            }
+            Object cap = automationSetting("DeploymentTasks.MaxProcesses", 8);
+            java.util.Map<String, Object> phpEnv = new java.util.LinkedHashMap<>();
+            phpEnv.put("Enabled", automationSetting("Environment.Enabled", false));
+            phpEnv.put("InheritContainerEnvironment",
+                    automationSetting("Environment.InheritContainerEnvironment", false));
+            phpEnv.put("FromContainer", automationSetting("Environment.FromContainer", java.util.List.of()));
+            phpEnv.put("SecretsFile", automationSetting("Environment.SecretsFile", ""));
+            phpEnv.put("Variables", automationSetting("Environment.Variables", java.util.Map.of()));
+            automation = new WebPluginAutomation(
+                    new PHPWebServerVel(this).runtimeOptions(),
+                    asString(automationSetting("Settings.IndexLocation", "")),
+                    asBoolean(automationSetting("Security.Landlock.Enabled", false), false),
+                    asString(automationSetting("Security.Landlock.Mode", "preferred")),
+                    asString(automationSetting("Security.Landlock.HelperPath", "")),
+                    asBoolean(automationSetting("DeploymentTasks.Enabled", false), false),
+                    cap instanceof Number ? ((Number) cap).intValue() : 8,
+                    taskConfigs, phpEnv, message -> logger.info("[Automation] " + message));
+            return true;
+        } catch (Exception ex) {
+            logger.severe("Automation startup failed; PHP will not launch without sandbox policy: " + ex.getMessage());
+            return false;
+        }
+    }
+
     private void StartwebserverphpLinux() {
         boolean enablePHP = (boolean) settings.get("EnablePHP");
         if (enablePHP) {
@@ -342,8 +400,17 @@ public class WebCoreProxyVel  {
     }
 
     private void Startwebserverhtml(){
+        boolean enableHTML = asBoolean(settings.get("EnableHTML"), false);
+        if (!enableHTML) {
+            acceptorRunning = false;
+            logger.info("Standalone HTML web server is disabled (Settings.EnableHTML=false).");
+            return;
+        }
+        if (!asBoolean(sslSettings.get("EnableSSL"), false) && ss == null) {
+            logger.severe("Standalone HTML listener cannot start because HTMLPORT was not bound.");
+            return;
+        }
         acceptorRunning = true;
-        boolean enableHTML = (Boolean) settings.get("EnableHTML");
         boolean enableSSL = (Boolean) sslSettings.get("EnableSSL");
         if (enableHTML){
             if (enableSSL){
@@ -360,8 +427,8 @@ public class WebCoreProxyVel  {
                                 Socket sock = ss.accept();
                                 new NoneSSLHtmlProxyVel(sock, m).start();
                             } catch (IOException e) {
-                                logger.severe("Error accepting socket connection");
-                                if (debug) e.printStackTrace();
+                                if (acceptorRunning) logger.severe("HTML accept failed: " + e.getMessage());
+                                if (acceptorRunning && debug) e.printStackTrace();
                             }
                         }
                     } catch (Exception e) {

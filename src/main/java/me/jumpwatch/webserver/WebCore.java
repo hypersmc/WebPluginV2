@@ -14,6 +14,7 @@ import me.jumpwatch.webserver.html.NoneSSLHtml;
 import me.jumpwatch.webserver.html.SSLHtml;
 import me.jumpwatch.webserver.php.linux.PHPWebServer;
 import me.jumpwatch.webserver.php.linux.PhpInstaller;
+import me.jumpwatch.webserver.automation.WebPluginAutomation;
 import me.jumpwatch.webserver.utils.*;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
@@ -42,6 +43,7 @@ public class WebCore extends JavaPlugin {
     public static String ver;
     private int version = 18;
     private CommandManager commandManager;
+    public WebPluginAutomation automation;
     public ContentTypeResolver resolver;
     final util util = new util();
 
@@ -123,6 +125,8 @@ public class WebCore extends JavaPlugin {
         } else {
             logger.info("SSL File doesn't exist!");
         }
+        // The Java HTML listener is independent of PHP/NGINX and uses HTMLPORT only without SSL.
+        if (getConfig().getBoolean("Settings.EnableHTML") && !getConfig().getBoolean("SSLSettings.EnableSSL")) {
         if (getConfig().isSet("Settings.HTMLPORT")) {
             try {
                 listeningport = getConfig().getInt("Settings.HTMLPORT");
@@ -145,12 +149,17 @@ public class WebCore extends JavaPlugin {
                 return;
             }
         }
+        }
+        boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()) {
             Startwebserverhtml();
         }
         if (CheckOS.isUnix()) {
             Startwebserverhtml();
-            StartwebserverphpLinux();
+            if (automationReady) {
+                StartwebserverphpLinux();
+                if (automation != null && getConfig().getBoolean("Settings.EnablePHP")) automation.startTasksIfReady();
+            }
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getName() + " in a linux machine but not in a docker container!");
             }
@@ -210,27 +219,17 @@ public class WebCore extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        if (automation != null) { automation.close(); automation = null; }
         if (!isFolia()) {
             Bukkit.getScheduler().cancelTasks(m); //problem in folia
             Bukkit.getScheduler().cancelTasks(this); //problem in folia
         }
         this.shutdown = true;
         acceptorRunning = false;
-        Socket sockCloser;
-        try {
-            sockCloser = new Socket("localhost", listeningport);
-            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sockCloser.getOutputStream()));
-            out.write(this.closeConnection);
-            out.close();
-            sockCloser.close();
-            getLogger().info( "Closed listening web server successfully!");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        try {
-            ss.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (ss != null) {
+            try { ss.close(); } catch (IOException e) {
+                getLogger().warning("Could not close HTML listener: " + e.getMessage());
+            } finally { ss = null; }
         }
         if (getConfig().getBoolean("Settings.EnablePHP")) {
             if (CheckOS.isUnix()) {
@@ -238,6 +237,36 @@ public class WebCore extends JavaPlugin {
             }
         }
 
+    }
+
+    /** Initialize the optional security manager before any PHP/NGINX processes are launched. */
+    private boolean initializeAutomation() {
+        if (!CheckOS.isUnix()) return true;
+        try {
+            java.util.Map<String, Object> phpEnv = new java.util.LinkedHashMap<>();
+            phpEnv.put("Enabled", getConfig().getBoolean("Environment.Enabled", false));
+            phpEnv.put("InheritContainerEnvironment",
+                    getConfig().getBoolean("Environment.InheritContainerEnvironment", false));
+            phpEnv.put("FromContainer", getConfig().getStringList("Environment.FromContainer"));
+            phpEnv.put("SecretsFile", getConfig().getString("Environment.SecretsFile", ""));
+            org.bukkit.configuration.ConfigurationSection vars =
+                    getConfig().getConfigurationSection("Environment.Variables");
+            phpEnv.put("Variables", vars == null ? java.util.Map.of() : vars.getValues(false));
+            automation = new WebPluginAutomation(
+                    new PHPWebServer(this).runtimeOptions(),
+                    getConfig().getString("Settings.IndexLocation", ""),
+                    getConfig().getBoolean("Security.Landlock.Enabled", false),
+                    getConfig().getString("Security.Landlock.Mode", "preferred"),
+                    getConfig().getString("Security.Landlock.HelperPath", ""),
+                    getConfig().getBoolean("DeploymentTasks.Enabled", false),
+                    getConfig().getInt("DeploymentTasks.MaxProcesses", 8),
+                    getConfig().getMapList("DeploymentTasks.Tasks"),
+                    phpEnv, message -> getLogger().info("[Automation] " + message));
+            return true;
+        } catch (Exception ex) {
+            getLogger().severe("Automation startup failed; PHP will not launch without the configured sandbox policy: " + ex.getMessage());
+            return false;
+        }
     }
 
     private void StartwebserverphpLinux(){
@@ -261,6 +290,15 @@ public class WebCore extends JavaPlugin {
         }
     }
     private void Startwebserverhtml(){
+        if (!getConfig().getBoolean("Settings.EnableHTML")) {
+            acceptorRunning = false;
+            getLogger().info("Standalone HTML web server is disabled (Settings.EnableHTML=false).");
+            return;
+        }
+        if (!getConfig().getBoolean("SSLSettings.EnableSSL") && ss == null) {
+            getLogger().severe("Standalone HTML listener cannot start because HTMLPORT was not bound.");
+            return;
+        }
         acceptorRunning = true;
         if (getConfig().getBoolean("Settings.EnableHTML")) {
             if (getConfig().getBoolean("SSLSettings.EnableSSL")) {
@@ -281,7 +319,7 @@ public class WebCore extends JavaPlugin {
                                 sock = ss.accept();
                                 new NoneSSLHtml(sock, m).start();
                             } catch (IOException e) {
-                                e.printStackTrace();
+                                if (getAcceptorRunning()) getLogger().warning("HTML accept failed: " + e.getMessage());
                             }
                         }
                     }
@@ -293,6 +331,33 @@ public class WebCore extends JavaPlugin {
     }
 
     private void registerCommand(){
+        commandManager.register("tasks", ((sender, params) -> {
+            if (!sender.hasPermission("web.tasks") && !sender.hasPermission("web.*") && !sender.isOp()) {
+                sender.sendMessage(prefix + " You do not have permission to manage deployment tasks.");
+                return;
+            }
+            if (automation == null) {
+                sender.sendMessage(prefix + " Automation is not initialized.");
+                return;
+            }
+            for (String line : automation.command(java.util.Arrays.asList(params)))
+                sender.sendMessage(prefix + " " + line);
+        }));
+        commandManager.register("sandbox", ((sender, params) -> {
+            if (!sender.hasPermission("web.tasks") && !sender.hasPermission("web.*") && !sender.isOp()) {
+                sender.sendMessage(prefix + " You do not have permission to inspect the sandbox.");
+                return;
+            }
+            if (automation == null) {
+                sender.sendMessage(prefix + " Sandbox not initialized.");
+                return;
+            }
+            java.util.List<String> arguments = new java.util.ArrayList<>();
+            arguments.add("sandbox");
+            arguments.addAll(java.util.Arrays.asList(params));
+            for (String line : automation.command(arguments))
+                sender.sendMessage(prefix + " " + line);
+        }));
         commandManager.register("help", ((sender, params) -> {
             if (sender.hasPermission("web.help") || sender.hasPermission("web.*")) {
                 sender.sendMessage(prefix + " Commands: ");
@@ -300,6 +365,9 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " /webp dev | gets who developed this plugin and plugin version");
                 sender.sendMessage(prefix + " /webp ver | gets plugin version and checks if there is a new version");
                 sender.sendMessage(prefix + " /webp help | to get this again.");
+                sender.sendMessage(prefix + " /webp tasks list|status|start|stop|logs | Manage configured PHP workers.");
+                sender.sendMessage(prefix + " /webp sandbox test | Check filesystem isolation without creating a public PHP endpoint.");
+                sender.sendMessage(prefix + " /webp sandbox result | Show latest filesystem self-test.");
                 sender.sendMessage(prefix + " /webp stopweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp startweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp webreload | (ONLY works if php is enabled!");

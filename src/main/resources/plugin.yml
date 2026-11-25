@@ -16,3 +16,8 @@ commands:
   WebP:
     description: Gets IP or Domain W/ Port
     usage: /<command>
+
+permissions:
+  web.tasks:
+    description: Allows managing configured WebPlugin deployment tasks and viewing Landlock status.
+    default: op

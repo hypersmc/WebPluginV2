@@ -1,0 +1,83 @@
+name: WebPlugin 4.2B automation checks
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  compile-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Compile and package plugin + native helper using Maven
+        run: mvn --batch-mode --no-transfer-progress -DskipTests clean package
+      - name: Verify helper is embedded in the plugin JAR
+        run: |
+          jar tf target/WebPlugin-4.2B.jar | grep -Fx 'native/linux-amd64/webplugin-landlock'
+          unzip -p target/WebPlugin-4.2B.jar native/linux-amd64/webplugin-landlock | sha256sum
+          test "$(unzip -p target/WebPlugin-4.2B.jar native/linux-amd64/webplugin-landlock | sha256sum | cut -d' ' -f1)" = "$(sha256sum target/generated-resources/native/linux-amd64/webplugin-landlock | cut -d' ' -f1)"
+      - name: Compile isolated automation tests
+        run: |
+          mkdir -p target/automation-smoke
+          javac -cp target/classes -d target/automation-smoke \
+            src/test/java/me/jumpwatch/webserver/automation/ProcessSupervisorSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/TaskEngineSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/LandlockSandboxSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/LandlockHelperInstallerSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/SandboxFilesystemProfileSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/PhpEnvironmentSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/TaskScheduleSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/ScheduledOverlapSmokeTest.java
+      - name: Test bundled helper auto-install and executable permissions
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.LandlockHelperInstallerSmokeTest
+      - name: Test Landlock fallback policy
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.LandlockSandboxSmokeTest
+      - name: Verify Java Landlock profiles isolate Minecraft files
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.SandboxFilesystemProfileSmokeTest
+      - name: Test PHP environment bridge and secret-safe pool config
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.PhpEnvironmentSmokeTest
+      - name: Test cron syntax and recurring PHP supervisor jobs
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.TaskScheduleSmokeTest
+      - name: Test scheduled task overlap prevention
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.ScheduledOverlapSmokeTest
+      - name: Run process supervisor smoke test
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.ProcessSupervisorSmokeTest
+      - name: Run deployment task persistence smoke test
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.TaskEngineSmokeTest
+      - name: Build and probe native Landlock helper
+        run: |
+          cp target/generated-resources/native/linux-amd64/webplugin-landlock target/webplugin-landlock
+          sha256sum target/webplugin-landlock
+          set +e
+          target/webplugin-landlock --probe
+          rc=$?
+          set -e
+          case "$rc" in
+            0)
+              echo "Landlock available: checking actual filesystem enforcement"
+              gcc -std=gnu11 -O2 -Wall -Wextra -o target/landlock-enforcement-test src/test/native/landlock-enforcement-test.c
+              tmp=$(mktemp -d)
+              mkdir -p "$tmp/site"
+              printf 'minecraft-sensitive' > "$tmp/minecraft-secret"
+              target/webplugin-landlock --rx /usr --rx /bin --rx /lib --rx /lib64 --rx "$PWD/target" --rw "$tmp/site" -- \
+                "$PWD/target/landlock-enforcement-test" "$tmp/site/allowed" "$tmp/minecraft-secret"
+              ;;
+            10|11|12) echo "Landlock unavailable on runner ($rc); sandbox enforcement test skipped";;
+            *) echo "Landlock probe unexpectedly failed with $rc"; exit 1;;
+          esac
+      - name: Publish self-contained Linux x86-64 beta JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebPlugin-4.2B-linux-amd64
+          # The native helper lives inside the JAR and is extracted at startup.
+          path: target/WebPlugin-4.2B.jar
+          if-no-files-found: error
+          retention-days: 14

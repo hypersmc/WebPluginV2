@@ -76,13 +76,76 @@ Settings:
   # WebPlugin does not download GLIBC/LIBONIG/LIBZ as separate archives anymore.
 
   # ── HTML Settings ──
-  EnableHTML: true                  # PHP can also serve HTML.
+  EnableHTML: true                  # Standalone Java HTML listener; independent of PHP/NGINX.
+                                    # false = do not bind HTMLPORT (PHP may still serve HTML).
 
   # ── Auto Key ──
   Autokey: false                     # Not functional currently.
 
   # ── NGINX Configuration ──
   denyNginxConfigOverride: false
+
+# ── Optional Linux filesystem sandbox (WebPlugin-wide) ──
+# The JAR bundles the Linux x86-64 helper and installs it automatically on startup.
+# The C launcher can sandbox PHP-FPM, NGINX and deployment commands.
+# The Minecraft JVM / standalone Java HTML listener cannot be Landlocked separately.
+# Check support at boot; on unsupported hosts "preferred" warns and continues.
+# "required" prevents affected native launches when isolation cannot be enforced.
+Security:
+  Landlock:
+    Enabled: false                 # Highly recommended when supported.
+    Mode: preferred                # preferred | required
+    HelperPath: ""                 # "" = automatically install/use plugins/webplugin/bin/webplugin-landlock
+
+# ── Optional PHP environment injection (4.2B beta) ──
+# Disabled by default. Only explicitly listed keys reach PHP CLI/FPM workers.
+# SecretsFile is a KEY=value file relative to plugins/webplugin/private/.
+# Never place tokens/passwords under the public php/ directory or in Variables.
+# PHP-FPM uses env[KEY] = $KEY (no secret values in www.conf).
+# Laravel may also use its own .env file; WebPlugin does NOT overwrite it.
+Environment:
+  Enabled: false
+  InheritContainerEnvironment: false   # Avoid leaking JVM/Pterodactyl variables to PHP.
+  FromContainer: []                    # Explicit allowlist, e.g. [APP_ENV]
+  Variables:
+    APP_ENV: production
+    APP_DEBUG: "false"
+  SecretsFile: ""                     # Example: database.env in plugins/webplugin/private/
+
+# ── Concurrent PHP CLI tasks / long-running workers (4.2B beta) ──
+# Requires Settings.EnablePHP=true and an installed modular PHP runtime.
+# This does NOT execute arbitrary shell strings: Arguments are passed to bundled PHP.
+# Task run modes: once, once-per-deployment, every-start, manual.
+# Task types: oneshot, service or scheduled; services support independent instances.
+# Type: scheduled supports Schedule: "*/5 * * * *" or Every: 1m / 6h.
+# Recurring executions are async, skip overlapping runs, and do not replay missed ticks.
+DeploymentTasks:
+  Enabled: false
+  MaxProcesses: 8
+  Tasks: []
+  # Example (add under Tasks, not alongside it):
+  # - Id: laravel-queue
+  #   Type: service
+  #   Runtime: bundled-php
+  #   WorkingDirectory: websites/myapp
+  #   Arguments: [artisan, "queue:work", "--sleep=3", "--tries=3"]
+  #   Instances: 2
+  #   AutoStart: true
+  #   Restart: on-failure
+  #   SuccessCodes: [0]
+  #   TimeoutSeconds: 0
+
+  # - Id: laravel-schedule
+  #   Type: scheduled
+  #   Runtime: bundled-php
+  #   WorkingDirectory: websites/myapp
+  #   Arguments: [artisan, "schedule:run"]
+  #   Schedule: "* * * * *"
+  #   TimeZone: Europe/Copenhagen
+  #   OverlapPolicy: skip
+  #   AutoStart: true
+  #   TimeoutSeconds: 50
+  # For intervals instead: Every: 6h (use either Schedule or Every, not both).
 
 # ── SSL Configuration ──
 SSLSettings:

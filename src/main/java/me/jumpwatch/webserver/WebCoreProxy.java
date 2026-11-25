@@ -4,6 +4,7 @@ package me.jumpwatch.webserver;
 import me.jumpwatch.webserver.html.NoneSSLHtmlProxyBun;
 import me.jumpwatch.webserver.php.linux.PHPWebServerBun;
 import me.jumpwatch.webserver.php.linux.PhpInstaller;
+import me.jumpwatch.webserver.automation.WebPluginAutomation;
 import me.jumpwatch.webserver.utils.CheckOS;
 import me.jumpwatch.webserver.utils.ContentTypeResolver;
 import net.md_5.bungee.api.ProxyServer;
@@ -33,7 +34,8 @@ import java.util.logging.Logger;
  */
 public class WebCoreProxy extends Plugin {
     public Configuration configuration;
-    public String pluginversion = "4.0R";
+    public WebPluginAutomation automation;
+    public String pluginversion = "4.2B";
     public static String closeConnection = "!Close Connection!";
     private int listeningport;
     private WebCoreProxy m = this;
@@ -90,6 +92,8 @@ public class WebCoreProxy extends Plugin {
         if (CheckOS.isWindows()) {
             logger.severe("Windows is not supported!");
         }
+        // Do not reserve an HTML port when the standalone HTML listener is disabled or using SSL.
+        if (configuration.getBoolean("Settings.EnableHTML") && !configuration.getBoolean("SSLSettings.EnableSSL")) {
         if (configuration.getString("Settings.HTMLPORT") != null){
             try {
                 listeningport = (int) configuration.getInt("Settings.HTMLPORT");
@@ -108,12 +112,34 @@ public class WebCoreProxy extends Plugin {
                 }
             }
         }
+        }
+        // Same shared task engine as Bukkit and Velocity; no arbitrary command execution.
+        ProxyServer.getInstance().getPluginManager().registerCommand(this,
+                new net.md_5.bungee.api.plugin.Command("webptasks", "webplugin.tasks") {
+                    @Override
+                    public void execute(net.md_5.bungee.api.CommandSender sender, String[] args) {
+                        if (!sender.hasPermission("webplugin.tasks")) {
+                            sender.sendMessage(new net.md_5.bungee.api.chat.TextComponent("[WebPlugin] No permission."));
+                            return;
+                        }
+                        if (automation == null) {
+                            sender.sendMessage(new net.md_5.bungee.api.chat.TextComponent("[WebPlugin] Automation not initialized."));
+                            return;
+                        }
+                        for (String line : automation.command(java.util.Arrays.asList(args)))
+                            sender.sendMessage(new net.md_5.bungee.api.chat.TextComponent("[WebPlugin] " + line));
+                    }
+                });
+        boolean automationReady = initializeAutomation();
         if (CheckOS.isWindows()){
             Startwebserverhtml();
         }
         if (CheckOS.isUnix()){
             Startwebserverhtml();
-            StartwebserverphpLinux();
+            if (automationReady) {
+                StartwebserverphpLinux();
+                if (automation != null && configuration.getBoolean("Settings.EnablePHP")) automation.startTasksIfReady();
+            }
             if (!CheckOS.isRunningInsideDocker()) {
                 logger.info("You are currently running " + this.getDescription().getName() + " in a linux machine but not in a docker container!");
             }
@@ -122,7 +148,14 @@ public class WebCoreProxy extends Plugin {
 
     @Override
     public void onDisable() {
-
+        if (automation != null) { automation.close(); automation = null; }
+        shutdown = true;
+        acceptorRunning = false;
+        if (ss != null) {
+            try { ss.close(); } catch (IOException e) {
+                logger.warning("Could not close HTML listener: " + e.getMessage());
+            } finally { ss = null; }
+        }
     }
 
     public void makeConfig() throws IOException {
@@ -176,9 +209,65 @@ public class WebCoreProxy extends Plugin {
             logger.severe("Failed to save resource " + resourcePath);
         }
     }
+    private boolean initializeAutomation() {
+        if (!CheckOS.isUnix() || configuration == null) return true;
+        try {
+            java.util.List<java.util.Map<?, ?>> taskConfigs = new java.util.ArrayList<>();
+            Object raw = configuration.get("DeploymentTasks.Tasks");
+            if (raw instanceof java.util.List<?>) {
+                for (Object entry : (java.util.List<?>) raw) {
+                    if (entry instanceof java.util.Map<?, ?>)
+                        taskConfigs.add((java.util.Map<?, ?>) entry);
+                    else if (entry instanceof Configuration) {
+                        Configuration section = (Configuration) entry;
+                        java.util.Map<String, Object> values = new java.util.LinkedHashMap<>();
+                        for (String key : section.getKeys()) values.put(key, section.get(key));
+                        taskConfigs.add(values);
+                    }
+                }
+            }
+            java.util.Map<String, Object> phpEnv = new java.util.LinkedHashMap<>();
+            phpEnv.put("Enabled", configuration.getBoolean("Environment.Enabled"));
+            phpEnv.put("InheritContainerEnvironment", configuration.getBoolean("Environment.InheritContainerEnvironment"));
+            phpEnv.put("FromContainer", configuration.getStringList("Environment.FromContainer"));
+            phpEnv.put("SecretsFile", configuration.getString("Environment.SecretsFile", ""));
+            Object variables = configuration.get("Environment.Variables");
+            if (variables instanceof Configuration) {
+                Configuration section = (Configuration) variables;
+                java.util.Map<String, Object> plain = new java.util.LinkedHashMap<>();
+                for (String key : section.getKeys()) plain.put(key, section.get(key));
+                phpEnv.put("Variables", plain);
+            } else {
+                phpEnv.put("Variables", variables instanceof java.util.Map<?, ?> ? variables : java.util.Map.of());
+            }
+            automation = new WebPluginAutomation(
+                    new PHPWebServerBun(this).runtimeOptions(),
+                    configuration.getString("Settings.IndexLocation"),
+                    configuration.getBoolean("Security.Landlock.Enabled"),
+                    configuration.getString("Security.Landlock.Mode", "preferred"),
+                    configuration.getString("Security.Landlock.HelperPath", ""),
+                    configuration.getBoolean("DeploymentTasks.Enabled"),
+                    configuration.getInt("DeploymentTasks.MaxProcesses", 8),
+                    taskConfigs, phpEnv, message -> logger.info("[Automation] " + message));
+            return true;
+        } catch (Exception ex) {
+            logger.severe("Automation startup failed; PHP will not launch without sandbox policy: " + ex.getMessage());
+            return false;
+        }
+    }
+
     private void Startwebserverhtml(){
+        boolean enableHTML = configuration.getBoolean("Settings.EnableHTML");
+        if (!enableHTML) {
+            acceptorRunning = false;
+            logger.info("Standalone HTML web server is disabled (Settings.EnableHTML=false).");
+            return;
+        }
+        if (!configuration.getBoolean("SSLSettings.EnableSSL") && ss == null) {
+            logger.severe("Standalone HTML listener cannot start because HTMLPORT was not bound.");
+            return;
+        }
         acceptorRunning = true;
-        boolean enableHTML = (Boolean) configuration.getBoolean("Settings.EnableHTML");
         boolean enableSSL = (Boolean) configuration.getBoolean("SSLSettings.EnableSSL");
         if (enableHTML){
             if (enableSSL){
@@ -194,7 +283,7 @@ public class WebCoreProxy extends Plugin {
                                 Socket socket = ss.accept();
                                 new NoneSSLHtmlProxyBun(socket, m).start();
                             } catch (IOException e) {
-                                logger.severe("Error accepting socket connection");
+                                if (acceptorRunning) logger.severe("Error accepting socket connection: " + e.getMessage());
                             }
                         }
                     } catch (Exception e) {

@@ -359,7 +359,7 @@ public class PHPWebServer{
 
     private void runPHPFPM(){
         try {
-            LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+            LinuxPhpProcessRunner runner = (main.automation == null ? new LinuxPhpProcessRunner(runtimeOptions()) : main.automation.runtime());
             runner.startPhpFpm();
         } catch (InterruptedException e) {
             if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
@@ -371,7 +371,7 @@ public class PHPWebServer{
 
     private void runNGINX(){
         try {
-            LinuxPhpProcessRunner runner = new LinuxPhpProcessRunner(runtimeOptions());
+            LinuxPhpProcessRunner runner = (main.automation == null ? new LinuxPhpProcessRunner(runtimeOptions()) : main.automation.runtime());
             runner.startNginx();
         } catch (InterruptedException e) {
             if (main.getConfig().getBoolean("Settings.debug")) DebugLogger.error(e.getMessage());
@@ -381,7 +381,7 @@ public class PHPWebServer{
         }
     }
 
-    private LinuxPhpRuntimeOptions runtimeOptions() {
+    public LinuxPhpRuntimeOptions runtimeOptions() {
         return new LinuxPhpRuntimeOptions(
                 main.getDataFolder(),
                 main.getConfig().getString("Settings.ServerLocation"),
