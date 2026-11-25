@@ -22,10 +22,13 @@ public final class TaskDefinition {
     public final Path workingDirectory;
     public final List<String> arguments;
     public final List<Integer> successCodes;
+    /** Null for normal one-shot/service tasks; non-null for scheduled PHP CLI jobs. */
+    public final TaskSchedule schedule;
 
     private TaskDefinition(String id, ProcessSupervisor.Kind kind, Run run, ProcessSupervisor.Restart restart,
                            boolean autoStart, int instances, long timeoutSeconds, String deploymentId,
-                           Path workingDirectory, List<String> arguments, List<Integer> successCodes) {
+                           Path workingDirectory, List<String> arguments, List<Integer> successCodes,
+                           TaskSchedule schedule) {
         this.id = id;
         this.kind = kind;
         this.run = run;
@@ -37,6 +40,7 @@ public final class TaskDefinition {
         this.workingDirectory = workingDirectory;
         this.arguments = Collections.unmodifiableList(arguments);
         this.successCodes = Collections.unmodifiableList(successCodes);
+        this.schedule = schedule;
     }
 
     public static TaskDefinition fromMap(Map<?, ?> config, Path serverRoot, Path defaultWebRoot) {
@@ -44,11 +48,20 @@ public final class TaskDefinition {
         if (!id.matches("[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}")) throw new IllegalArgumentException("Invalid task Id: " + id);
         String runtime = string(config, "Runtime", "bundled-php");
         if (!runtime.equalsIgnoreCase("bundled-php")) throw new IllegalArgumentException("Only Runtime: bundled-php is supported in 4.2R");
-        ProcessSupervisor.Kind kind = ProcessSupervisor.Kind.valueOf(string(config, "Type", "oneshot").toUpperCase(Locale.ROOT));
-        Run run = Run.valueOf(string(config, "Run", kind == ProcessSupervisor.Kind.SERVICE ? "manual" : "once")
+        String type = string(config, "Type", "oneshot").toLowerCase(Locale.ROOT);
+        boolean scheduled = type.equals("scheduled");
+        ProcessSupervisor.Kind kind = scheduled ? ProcessSupervisor.Kind.ONESHOT :
+                ProcessSupervisor.Kind.valueOf(type.toUpperCase(Locale.ROOT));
+        Run run = Run.valueOf(string(config, "Run",
+                scheduled || kind == ProcessSupervisor.Kind.SERVICE ? "manual" : "once")
                 .replace('-', '_').toUpperCase(Locale.ROOT));
         ProcessSupervisor.Restart restart = ProcessSupervisor.Restart.valueOf(string(config, "Restart", "never")
                 .replace('-', '_').toUpperCase(Locale.ROOT));
+        TaskSchedule schedule = scheduled ? TaskSchedule.fromMap(config) : null;
+        if (!scheduled && (config.containsKey("Schedule") || config.containsKey("Every")))
+            throw new IllegalArgumentException("Schedule/Every requires Type: scheduled");
+        if (scheduled && run != Run.MANUAL)
+            throw new IllegalArgumentException("Scheduled tasks cannot have a Run ledger policy");
         int instances = number(config, "Instances", 1);
         int timeout = number(config, "TimeoutSeconds", kind == ProcessSupervisor.Kind.ONESHOT ? 180 : 0);
         String deploymentId = string(config, "DeploymentId", "");
@@ -79,9 +92,12 @@ public final class TaskDefinition {
         } else throw new IllegalArgumentException("SuccessCodes must be a list: " + id);
         if (codes.isEmpty()) throw new IllegalArgumentException("SuccessCodes is empty: " + id);
         if (kind == ProcessSupervisor.Kind.ONESHOT && (instances != 1 || restart != ProcessSupervisor.Restart.NEVER))
-            throw new IllegalArgumentException("One-shot tasks cannot have instances >1 or Restart != never");
-        return new TaskDefinition(id, kind, run, restart, bool(config, "AutoStart", kind == ProcessSupervisor.Kind.SERVICE),
-                instances, timeout, deploymentId, cwd, args, codes);
+            throw new IllegalArgumentException("One-shot/scheduled tasks cannot have instances >1 or Restart != never");
+        if (scheduled && timeout <= 0)
+            throw new IllegalArgumentException("Scheduled tasks need a positive TimeoutSeconds");
+        return new TaskDefinition(id, kind, run, restart,
+                bool(config, "AutoStart", scheduled || kind == ProcessSupervisor.Kind.SERVICE),
+                instances, timeout, deploymentId, cwd, args, codes, schedule);
     }
 
     private static String string(Map<?, ?> m, String key, String fallback) {

@@ -2,6 +2,7 @@ package me.jumpwatch.webserver.automation;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -30,6 +31,13 @@ public final class TaskEngine implements AutoCloseable {
     private final Path nginxRuntime;
     private final Consumer<String> log;
     private final Map<String, TaskDefinition> definitions = new HashMap<>();
+    private final Map<String, ScheduleState> scheduled = new HashMap<>();
+    private boolean schedulesStarted;
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread thread = new Thread(r, "webplugin-cron-scheduler");
+        thread.setDaemon(true);
+        return thread;
+    });
     private final ScheduledExecutorService reconciliation = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread thread = new Thread(r, "webplugin-task-ledger");
         thread.setDaemon(true);
@@ -59,11 +67,23 @@ public final class TaskEngine implements AutoCloseable {
             TaskDefinition definition = TaskDefinition.fromMap(entry, serverRoot, defaultWebRoot);
             if (definitions.putIfAbsent(definition.id, definition) != null)
                 throw new IllegalArgumentException("Duplicate task Id: " + definition.id);
+            if (definition.schedule != null)
+                scheduled.put(definition.id, new ScheduleState(definition));
         }
     }
 
     public synchronized void autoStart() {
+        if (!schedulesStarted) {
+            schedulesStarted = true;
+            for (ScheduleState state : scheduled.values()) {
+                state.paused = !state.task.autoStart;
+                state.reset();
+            }
+            // One lightweight timer; all executions go into the existing bounded supervisor.
+            scheduler.scheduleWithFixedDelay(this::tick, 1, 1, TimeUnit.SECONDS);
+        }
         for (TaskDefinition task : definitions.values()) {
+            if (task.schedule != null) continue;
             try {
                 if (task.kind == ProcessSupervisor.Kind.SERVICE && task.autoStart) start(task.id);
                 else if (task.kind == ProcessSupervisor.Kind.ONESHOT && ledger.shouldRun(task)) start(task.id);
@@ -73,17 +93,60 @@ public final class TaskEngine implements AutoCloseable {
         }
     }
 
-    /** For use by an authenticated console command; not a website HTTP endpoint. */
+    private synchronized void tick() {
+        if (closed.get()) return;
+        Instant now = Instant.now();
+        for (ScheduleState state : scheduled.values()) {
+            if (state.paused || !state.due(now)) continue;
+            ProcessSupervisor.Snapshot snapshot = supervisor.snapshot(state.task.id);
+            if (snapshot != null && active(snapshot.state)) {
+                log.accept("Scheduled PHP task " + state.task.id + " skipped: previous run still active");
+                continue;
+            }
+            try {
+                launch(state.task);
+            } catch (RuntimeException ex) {
+                // A missed tick is skipped; no unbounded replay or backlog.
+                log.accept("Scheduled PHP task " + state.task.id + " skipped: "
+                        + ex.getClass().getSimpleName());
+            }
+        }
+    }
+
+    private static boolean active(ProcessSupervisor.State state) {
+        return state == ProcessSupervisor.State.QUEUED || state == ProcessSupervisor.State.STARTING ||
+                state == ProcessSupervisor.State.RUNNING || state == ProcessSupervisor.State.RESTART_WAIT;
+    }
+
+    /** For administrators: scheduled start resumes ticks; other tasks start immediately. */
     public synchronized void start(String id) {
+        TaskDefinition task = get(id);
+        if (task.schedule != null) {
+            ScheduleState state = scheduled.get(id);
+            state.paused = false;
+            state.reset(); // Resume with next interval / next cron minute; no catch-up.
+            return;
+        }
+        launch(task);
+    }
+
+    /** Explicit one-time invocation, including scheduled tasks, without modifying the schedule. */
+    public synchronized void run(String id) {
+        launch(get(id));
+    }
+
+    private TaskDefinition get(String id) {
         if (closed.get()) throw new IllegalStateException("Task engine is closed");
         TaskDefinition task = definitions.get(id);
         if (task == null) throw new IllegalArgumentException("Unknown task Id: " + id);
-        recordedExits.remove(id);
+        return task;
+    }
+
+    private void launch(TaskDefinition task) {
+        recordedExits.remove(task.id);
         ProcessSupervisor.Spec spec = new ProcessSupervisor.Spec(task.id, task.kind, task.restart,
                 task.instances, task.timeoutSeconds, task.successCodes, () -> {
                     ProcessBuilder original = phpCliBuilder.build(task.workingDirectory, task.arguments);
-                    // Even if the PHP runtime factory has prepared its own environment, protect
-                    // the resulting process (and descendants) before the first exec.
                     return sandbox.protect(original, LandlockSandbox.Role.TASK,
                             pluginData, task.workingDirectory, phpRuntime, nginxRuntime);
                 });
@@ -91,10 +154,20 @@ public final class TaskEngine implements AutoCloseable {
     }
 
     public synchronized void stop(String id) {
-        TaskDefinition task = definitions.get(id);
-        if (task == null) throw new IllegalArgumentException("Unknown task Id: " + id);
+        TaskDefinition task = get(id);
+        if (task.schedule != null) scheduled.get(id).paused = true;
         if (task.instances == 1) supervisor.stop(id);
         else for (int i = 1; i <= task.instances; i++) supervisor.stop(id + "#" + i);
+    }
+
+    public synchronized List<String> scheduledStatus() {
+        List<String> lines = new ArrayList<>();
+        for (ScheduleState state : scheduled.values())
+            lines.add(state.task.id + ": " + (state.paused ? "paused" : "active")
+                    + ", schedule=" + state.task.schedule.expression
+                    + (state.task.schedule.cron ? ", timezone=" + state.task.schedule.timeZone : "")
+                    + ", overlap=skip");
+        return lines;
     }
 
     public Collection<TaskDefinition> definitions() { return List.copyOf(definitions.values()); }
@@ -103,7 +176,7 @@ public final class TaskEngine implements AutoCloseable {
     private synchronized void reconcile() {
         if (closed.get()) return;
         for (TaskDefinition task : definitions.values()) {
-            if (task.kind != ProcessSupervisor.Kind.ONESHOT) continue;
+            if (task.kind != ProcessSupervisor.Kind.ONESHOT || task.schedule != null) continue;
             ProcessSupervisor.Snapshot snapshot = supervisor.snapshot(task.id);
             if (snapshot == null || snapshot.state != ProcessSupervisor.State.COMPLETED || snapshot.lastExitCode == null)
                 continue;
@@ -124,6 +197,39 @@ public final class TaskEngine implements AutoCloseable {
         reconcile();
         closed.set(true);
         reconciliation.shutdownNow();
+        scheduler.shutdownNow();
         supervisor.close();
+    }
+
+    private static final class ScheduleState {
+        final TaskDefinition task;
+        boolean paused;
+        long lastCronMinute;
+        long nextIntervalNanos;
+
+        ScheduleState(TaskDefinition task) {
+            this.task = task;
+            this.paused = true; // Nothing starts until PHP is available and autoStart() is called.
+            reset();
+        }
+
+        void reset() {
+            lastCronMinute = Instant.now().getEpochSecond() / 60L;
+            if (!task.schedule.cron) nextIntervalNanos = System.nanoTime() + task.schedule.interval.toNanos();
+        }
+
+        boolean due(Instant now) {
+            if (task.schedule.cron) {
+                long minute = now.getEpochSecond() / 60L;
+                if (minute == lastCronMinute) return false;
+                lastCronMinute = minute;
+                return task.schedule.matches(now);
+            }
+            long time = System.nanoTime();
+            if (time - nextIntervalNanos < 0) return false;
+            // Drift-free enough for a hosting scheduler; never replay missed ticks.
+            nextIntervalNanos = time + task.schedule.interval.toNanos();
+            return true;
+        }
     }
 }
