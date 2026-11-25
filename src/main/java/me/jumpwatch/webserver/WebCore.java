@@ -343,7 +343,10 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " Sandbox not initialized.");
                 return;
             }
-            for (String line : automation.command(java.util.List.of("sandbox")))
+            java.util.List<String> arguments = new java.util.ArrayList<>();
+            arguments.add("sandbox");
+            arguments.addAll(java.util.Arrays.asList(params));
+            for (String line : automation.command(arguments))
                 sender.sendMessage(prefix + " " + line);
         }));
         commandManager.register("help", ((sender, params) -> {
@@ -354,7 +357,8 @@ public class WebCore extends JavaPlugin {
                 sender.sendMessage(prefix + " /webp ver | gets plugin version and checks if there is a new version");
                 sender.sendMessage(prefix + " /webp help | to get this again.");
                 sender.sendMessage(prefix + " /webp tasks list|status|start|stop|logs | Manage configured PHP workers.");
-                sender.sendMessage(prefix + " /webp sandbox | Show Landlock availability and protection status.");
+                sender.sendMessage(prefix + " /webp sandbox test | Check filesystem isolation without creating a public PHP endpoint.");
+                sender.sendMessage(prefix + " /webp sandbox result | Show latest filesystem self-test.");
                 sender.sendMessage(prefix + " /webp stopweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp startweb | (ONLY works if php is enabled!");
                 sender.sendMessage(prefix + " /webp webreload | (ONLY works if php is enabled!");

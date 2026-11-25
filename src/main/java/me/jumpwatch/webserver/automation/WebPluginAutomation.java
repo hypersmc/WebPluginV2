@@ -23,6 +23,7 @@ public final class WebPluginAutomation implements AutoCloseable {
     private final LandlockSandbox sandbox;
     private final LinuxPhpProcessRunner runtime;
     private final TaskEngine tasks;
+    private final SandboxFilesystemSelfTest filesystemSelfTest;
     private final Path websiteRoot;
     private final Consumer<String> log;
     private volatile boolean tasksStarted;
@@ -51,6 +52,7 @@ public final class WebPluginAutomation implements AutoCloseable {
         }
         this.sandbox = new LandlockSandbox(landlockEnabled, mode, helper, log);
         this.runtime = new LinuxPhpProcessRunner(options, sandbox, websiteRoot);
+        this.filesystemSelfTest = new SandboxFilesystemSelfTest(sandbox, runtime, websiteRoot, log);
 
         TaskEngine engine = null;
         if (tasksEnabled) {
@@ -99,8 +101,14 @@ public final class WebPluginAutomation implements AutoCloseable {
         }
         String action = args.get(0).toLowerCase(Locale.ROOT);
         if (action.equals("sandbox")) {
+            if (args.size() >= 2 && args.get(1).equalsIgnoreCase("test"))
+                return List.of(filesystemSelfTest.start());
+            if (args.size() >= 2 && args.get(1).equalsIgnoreCase("result"))
+                return List.of("Filesystem self-test: " + filesystemSelfTest.result());
             return List.of("Landlock: " + (sandbox.isEnabled() ? "enabled" : "disabled")
-                    + ", availability=" + sandbox.getAvailability() + ", " + sandbox.getProbeDetail());
+                            + ", availability=" + sandbox.getAvailability() + ", " + sandbox.getProbeDetail(),
+                    "Filesystem self-test: " + filesystemSelfTest.result(),
+                    "Run sandbox test to check PHP-FPM and task filesystem isolation.");
         }
         if (tasks == null) return List.of("Deployment tasks are disabled or misconfigured.");
         try {
@@ -148,6 +156,7 @@ public final class WebPluginAutomation implements AutoCloseable {
     }
 
     @Override public void close() {
+        filesystemSelfTest.close();
         if (tasks != null) tasks.close();
     }
 }
