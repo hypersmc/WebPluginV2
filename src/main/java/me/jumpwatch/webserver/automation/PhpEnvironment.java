@@ -119,6 +119,8 @@ public final class PhpEnvironment {
 
     private static void loadSecrets(Map<String, String> target, Path pluginData, String relative) throws IOException {
         Path base = pluginData.toAbsolutePath().normalize().resolve("private");
+        if (Files.isSymbolicLink(base))
+            throw new IOException("Environment private directory must not be a symlink");
         Path path = Path.of(relative);
         if (path.isAbsolute()) throw new IllegalArgumentException("SecretsFile must be relative to plugins/webplugin/private/");
         path = base.resolve(path).normalize();

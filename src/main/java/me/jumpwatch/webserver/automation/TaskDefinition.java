@@ -72,6 +72,15 @@ public final class TaskDefinition {
         cwd = cwd.toAbsolutePath().normalize();
         if (!Files.isDirectory(cwd)) throw new IllegalArgumentException("WorkingDirectory does not exist: " + cwd);
         try { cwd = cwd.toRealPath(); } catch (Exception ex) { throw new IllegalArgumentException("WorkingDirectory unavailable: " + cwd, ex); }
+        // The task profile grants write permission to its WorkingDirectory. Never
+        // let a typo grant write access to the whole Minecraft server or /.
+        try {
+            Path canonicalServerRoot = serverRoot.toRealPath();
+            if (cwd.equals(canonicalServerRoot) || cwd.equals(cwd.getRoot()))
+                throw new IllegalArgumentException("WorkingDirectory is too broad for sandboxed PHP: " + cwd);
+        } catch (java.io.IOException ex) {
+            throw new IllegalArgumentException("Cannot validate ServerLocation for task " + id, ex);
+        }
         Object rawArgs = config.get("Arguments");
         if (!(rawArgs instanceof List)) throw new IllegalArgumentException("Arguments must be a YAML list: " + id);
         List<String> args = new ArrayList<>();
