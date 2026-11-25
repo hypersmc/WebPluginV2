@@ -97,11 +97,28 @@ Security:
     Mode: preferred                # preferred | required
     HelperPath: ""                 # "" = automatically install/use plugins/webplugin/bin/webplugin-landlock
 
+# ── Optional PHP environment injection (4.2B beta) ──
+# Disabled by default. Only explicitly listed keys reach PHP CLI/FPM workers.
+# SecretsFile is a KEY=value file relative to plugins/webplugin/private/.
+# Never place tokens/passwords under the public php/ directory or in Variables.
+# PHP-FPM uses env[KEY] = $KEY (no secret values in www.conf).
+# Laravel may also use its own .env file; WebPlugin does NOT overwrite it.
+Environment:
+  Enabled: false
+  InheritContainerEnvironment: false   # Avoid leaking JVM/Pterodactyl variables to PHP.
+  FromContainer: []                    # Explicit allowlist, e.g. [APP_ENV]
+  Variables:
+    APP_ENV: production
+    APP_DEBUG: "false"
+  SecretsFile: ""                     # Example: database.env in plugins/webplugin/private/
+
 # ── Concurrent PHP CLI tasks / long-running workers (4.2B beta) ──
 # Requires Settings.EnablePHP=true and an installed modular PHP runtime.
 # This does NOT execute arbitrary shell strings: Arguments are passed to bundled PHP.
 # Task run modes: once, once-per-deployment, every-start, manual.
-# Task types: oneshot or service; services support multiple independent instances.
+# Task types: oneshot, service or scheduled; services support independent instances.
+# Type: scheduled supports Schedule: "*/5 * * * *" or Every: 1m / 6h.
+# Recurring executions are async, skip overlapping runs, and do not replay missed ticks.
 DeploymentTasks:
   Enabled: false
   MaxProcesses: 8
@@ -117,6 +134,18 @@ DeploymentTasks:
   #   Restart: on-failure
   #   SuccessCodes: [0]
   #   TimeoutSeconds: 0
+
+  # - Id: laravel-schedule
+  #   Type: scheduled
+  #   Runtime: bundled-php
+  #   WorkingDirectory: websites/myapp
+  #   Arguments: [artisan, "schedule:run"]
+  #   Schedule: "* * * * *"
+  #   TimeZone: Europe/Copenhagen
+  #   OverlapPolicy: skip
+  #   AutoStart: true
+  #   TimeoutSeconds: 50
+  # For intervals instead: Every: 6h (use either Schedule or Every, not both).
 
 # ── SSL Configuration ──
 SSLSettings:
