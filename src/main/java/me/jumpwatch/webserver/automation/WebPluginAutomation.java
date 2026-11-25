@@ -23,6 +23,7 @@ public final class WebPluginAutomation implements AutoCloseable {
     private final LandlockSandbox sandbox;
     private final LinuxPhpProcessRunner runtime;
     private final TaskEngine tasks;
+    private final PhpEnvironment phpEnvironment;
     private final SandboxFilesystemSelfTest filesystemSelfTest;
     private final Path websiteRoot;
     private final Consumer<String> log;
@@ -31,7 +32,7 @@ public final class WebPluginAutomation implements AutoCloseable {
     public WebPluginAutomation(LinuxPhpRuntimeOptions options, String indexLocation,
                                boolean landlockEnabled, String landlockMode, String helperLocation,
                                boolean tasksEnabled, int maxProcesses, List<? extends Map<?, ?>> taskConfigs,
-                               Consumer<String> log) throws IOException {
+                               Map<?, ?> environmentConfig, Consumer<String> log) throws IOException {
         this.log = Objects.requireNonNull(log);
         LinuxPhpRuntimePaths paths = new LinuxPhpRuntimePaths(options);
         Path dataRoot = paths.dataRoot();
@@ -51,7 +52,11 @@ public final class WebPluginAutomation implements AutoCloseable {
             log.accept("Invalid Security.Landlock.Mode; using required rather than disabling protection.");
         }
         this.sandbox = new LandlockSandbox(landlockEnabled, mode, helper, log);
-        this.runtime = new LinuxPhpProcessRunner(options, sandbox, websiteRoot);
+        this.phpEnvironment = PhpEnvironment.fromMap(environmentConfig, dataRoot);
+        this.runtime = new LinuxPhpProcessRunner(options, sandbox, websiteRoot, phpEnvironment);
+        if (phpEnvironment.enabled())
+            log.accept("PHP environment bridge enabled: " + phpEnvironment.size()
+                    + " explicit variable name(s), values never logged.");
         this.filesystemSelfTest = new SandboxFilesystemSelfTest(sandbox, runtime, websiteRoot, log);
 
         TaskEngine engine = null;
@@ -74,6 +79,7 @@ public final class WebPluginAutomation implements AutoCloseable {
     public LinuxPhpProcessRunner runtime() { return runtime; }
     public Path websiteRoot() { return websiteRoot; }
     public TaskEngine tasks() { return tasks; }
+    public PhpEnvironment environment() { return phpEnvironment; }
 
     /**
      * Call after bundled PHP has been installed; never blocks on the worker process.
@@ -97,7 +103,7 @@ public final class WebPluginAutomation implements AutoCloseable {
     public List<String> command(List<String> args) {
         List<String> lines = new ArrayList<>();
         if (args == null || args.isEmpty()) {
-            return List.of("Usage: tasks list|status [id]|logs <id>|start <id>|stop <id>");
+            return List.of("Usage: tasks list|status [id]|logs <id>|start <id>|stop <id>|run <id>|sandbox");
         }
         String action = args.get(0).toLowerCase(Locale.ROOT);
         if (action.equals("sandbox")) {
@@ -110,14 +116,19 @@ public final class WebPluginAutomation implements AutoCloseable {
                     "Filesystem self-test: " + filesystemSelfTest.result(),
                     "Run sandbox test to check PHP-FPM and task filesystem isolation.");
         }
+        if (action.equals("environment")) {
+            return List.of("PHP environment bridge: " + (phpEnvironment.enabled() ? "enabled" : "disabled")
+                    + ", explicit names=" + phpEnvironment.size() + " (values are never shown)");
+        }
         if (tasks == null) return List.of("Deployment tasks are disabled or misconfigured.");
         try {
             switch (action) {
                 case "list":
                     if (tasks.definitions().isEmpty()) return List.of("No deployment tasks configured.");
                     for (TaskDefinition definition : tasks.definitions())
-                        lines.add(definition.id + ": " + definition.kind + ", run=" + definition.run
-                                + ", instances=" + definition.instances);
+                        lines.add(definition.id + ": " + (definition.schedule != null ? "SCHEDULED" : definition.kind)
+                                + ", run=" + definition.run + ", instances=" + definition.instances);
+                    lines.addAll(tasks.scheduledStatus());
                     break;
                 case "status":
                     for (ProcessSupervisor.Snapshot snapshot : tasks.snapshots()) {
@@ -126,6 +137,9 @@ public final class WebPluginAutomation implements AutoCloseable {
                             lines.add(snapshot.id + ": " + snapshot.state + " pid=" + snapshot.pid
                                     + " exit=" + snapshot.lastExitCode + " restarts=" + snapshot.restarts);
                     }
+                    if (args.size() < 2) lines.addAll(tasks.scheduledStatus());
+                    else for (String scheduleStatus : tasks.scheduledStatus())
+                        if (scheduleStatus.startsWith(args.get(1) + ":")) lines.add(scheduleStatus);
                     if (lines.isEmpty()) lines.add("No matching task processes.");
                     break;
                 case "logs":
@@ -144,10 +158,15 @@ public final class WebPluginAutomation implements AutoCloseable {
                 case "stop":
                     if (args.size() < 2) return List.of("Usage: tasks stop <id>");
                     tasks.stop(args.get(1));
-                    lines.add("Stop requested for " + args.get(1) + ".");
+                    lines.add("Stop/pause requested for " + args.get(1) + ".");
+                    break;
+                case "run":
+                    if (args.size() < 2) return List.of("Usage: tasks run <id>");
+                    tasks.run(args.get(1));
+                    lines.add("Manual execution submitted for " + args.get(1) + ".");
                     break;
                 default:
-                    lines.add("Usage: tasks list|status [id]|logs <id>|start <id>|stop <id>");
+                    lines.add("Usage: tasks list|status [id]|logs <id>|start <id>|stop <id>|run <id>");
             }
         } catch (RuntimeException ex) {
             lines.add("Task command failed: " + ex.getMessage());
