@@ -61,7 +61,7 @@ public final class TaskScheduleSmokeTest {
                 root.resolve("not-needed"), System.out::println);
         try (TaskEngine engine = new TaskEngine(root, site, phpRuntime, nginxRuntime,
                 2, (cwd, phpArgs) -> new ProcessBuilder("/bin/sh", "-c",
-                        "printf tick > \\"" + output.toString() + "\\"").directory(cwd.toFile()),
+                        "printf tick > \"$1\"", "cron-smoke", output.toString()).directory(cwd.toFile()),
                 off, System.out::println)) {
             engine.load(List.of(task), root, site);
             engine.autoStart();
