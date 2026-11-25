@@ -26,8 +26,8 @@ public final class SandboxFilesystemProfileSmokeTest {
         Path php = Files.createDirectories(plugin.resolve("phplinux"));
         Path nginx = Files.createDirectories(plugin.resolve("nginxlinux"));
         Path sentinel = Files.writeString(server.resolve("minecraft-private-sentinel"),
-                "do-not-expose", StandardCharsets.UTF_8);
-        if (!Files.readString(sentinel).equals("do-not-expose"))
+                "do-not-expose\\n", StandardCharsets.UTF_8);
+        if (!Files.readString(sentinel).trim().equals("do-not-expose"))
             throw new AssertionError("JVM must be able to read the sentinel before sandboxing");
         Path helper = LandlockHelperInstaller.prepare(plugin, server, "", System.out::println);
         LandlockSandbox sandbox = new LandlockSandbox(true, LandlockSandbox.Mode.REQUIRED,
@@ -62,7 +62,7 @@ public final class SandboxFilesystemProfileSmokeTest {
 
         // NGINX reads site content, but must not be able to write inside the site
         // nor read the independent Minecraft-root sentinel.
-        Path siteFile = Files.writeString(website.resolve("index-sentinel.txt"), "public-content");
+        Path siteFile = Files.writeString(website.resolve("index-sentinel.txt"), "public-content\\n");
         Path notWritable = website.resolve("nginx-should-not-write");
         ProcessBuilder nginxChild = new ProcessBuilder("/bin/sh", "-c",
                 "IFS= read -r value < \"$1\" || exit 51; "
