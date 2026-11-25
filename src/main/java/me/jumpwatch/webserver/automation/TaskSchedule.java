@@ -87,9 +87,12 @@ public final class TaskSchedule {
             return false;
         boolean monthDay = days[date.getDayOfMonth()];
         boolean weekDay = weekdays[date.getDayOfWeek().getValue() % 7];
-        boolean matchedDay = anyDay && anyWeekday || anyDay && weekDay ||
-                anyWeekday && monthDay || monthDay && weekDay;
-        return matchedDay;
+        // Standard Vixie cron semantics: if both DOM and DOW are restricted,
+        // EITHER may match (otherwise use the one restricted field).
+        if (anyDay && anyWeekday) return true;
+        if (anyDay) return weekDay;
+        if (anyWeekday) return monthDay;
+        return monthDay || weekDay;
     }
 
     private static boolean[] parseField(String source, int min, int max, boolean weekday) {
