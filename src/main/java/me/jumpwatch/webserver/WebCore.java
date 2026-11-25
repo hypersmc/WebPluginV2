@@ -243,6 +243,15 @@ public class WebCore extends JavaPlugin {
     private boolean initializeAutomation() {
         if (!CheckOS.isUnix()) return true;
         try {
+            java.util.Map<String, Object> phpEnv = new java.util.LinkedHashMap<>();
+            phpEnv.put("Enabled", getConfig().getBoolean("Environment.Enabled", false));
+            phpEnv.put("InheritContainerEnvironment",
+                    getConfig().getBoolean("Environment.InheritContainerEnvironment", false));
+            phpEnv.put("FromContainer", getConfig().getStringList("Environment.FromContainer"));
+            phpEnv.put("SecretsFile", getConfig().getString("Environment.SecretsFile", ""));
+            org.bukkit.configuration.ConfigurationSection vars =
+                    getConfig().getConfigurationSection("Environment.Variables");
+            phpEnv.put("Variables", vars == null ? java.util.Map.of() : vars.getValues(false));
             automation = new WebPluginAutomation(
                     new PHPWebServer(this).runtimeOptions(),
                     getConfig().getString("Settings.IndexLocation", ""),
@@ -252,7 +261,7 @@ public class WebCore extends JavaPlugin {
                     getConfig().getBoolean("DeploymentTasks.Enabled", false),
                     getConfig().getInt("DeploymentTasks.MaxProcesses", 8),
                     getConfig().getMapList("DeploymentTasks.Tasks"),
-                    message -> getLogger().info("[Automation] " + message));
+                    phpEnv, message -> getLogger().info("[Automation] " + message));
             return true;
         } catch (Exception ex) {
             getLogger().severe("Automation startup failed; PHP will not launch without the configured sandbox policy: " + ex.getMessage());

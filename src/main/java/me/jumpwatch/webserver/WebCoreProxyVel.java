@@ -336,6 +336,13 @@ public class WebCoreProxyVel  {
                         taskConfigs.add((java.util.Map<?, ?>) entry);
             }
             Object cap = automationSetting("DeploymentTasks.MaxProcesses", 8);
+            java.util.Map<String, Object> phpEnv = new java.util.LinkedHashMap<>();
+            phpEnv.put("Enabled", automationSetting("Environment.Enabled", false));
+            phpEnv.put("InheritContainerEnvironment",
+                    automationSetting("Environment.InheritContainerEnvironment", false));
+            phpEnv.put("FromContainer", automationSetting("Environment.FromContainer", java.util.List.of()));
+            phpEnv.put("SecretsFile", automationSetting("Environment.SecretsFile", ""));
+            phpEnv.put("Variables", automationSetting("Environment.Variables", java.util.Map.of()));
             automation = new WebPluginAutomation(
                     new PHPWebServerVel(this).runtimeOptions(),
                     asString(automationSetting("Settings.IndexLocation", "")),
@@ -344,7 +351,7 @@ public class WebCoreProxyVel  {
                     asString(automationSetting("Security.Landlock.HelperPath", "")),
                     asBoolean(automationSetting("DeploymentTasks.Enabled", false), false),
                     cap instanceof Number ? ((Number) cap).intValue() : 8,
-                    taskConfigs, message -> logger.info("[Automation] " + message));
+                    taskConfigs, phpEnv, message -> logger.info("[Automation] " + message));
             return true;
         } catch (Exception ex) {
             logger.severe("Automation startup failed; PHP will not launch without sandbox policy: " + ex.getMessage());

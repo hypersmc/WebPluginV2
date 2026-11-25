@@ -226,6 +226,20 @@ public class WebCoreProxy extends Plugin {
                     }
                 }
             }
+            java.util.Map<String, Object> phpEnv = new java.util.LinkedHashMap<>();
+            phpEnv.put("Enabled", configuration.getBoolean("Environment.Enabled"));
+            phpEnv.put("InheritContainerEnvironment", configuration.getBoolean("Environment.InheritContainerEnvironment"));
+            phpEnv.put("FromContainer", configuration.getStringList("Environment.FromContainer"));
+            phpEnv.put("SecretsFile", configuration.getString("Environment.SecretsFile", ""));
+            Object variables = configuration.get("Environment.Variables");
+            if (variables instanceof Configuration) {
+                Configuration section = (Configuration) variables;
+                java.util.Map<String, Object> plain = new java.util.LinkedHashMap<>();
+                for (String key : section.getKeys()) plain.put(key, section.get(key));
+                phpEnv.put("Variables", plain);
+            } else {
+                phpEnv.put("Variables", variables instanceof java.util.Map<?, ?> ? variables : java.util.Map.of());
+            }
             automation = new WebPluginAutomation(
                     new PHPWebServerBun(this).runtimeOptions(),
                     configuration.getString("Settings.IndexLocation"),
@@ -234,7 +248,7 @@ public class WebCoreProxy extends Plugin {
                     configuration.getString("Security.Landlock.HelperPath", ""),
                     configuration.getBoolean("DeploymentTasks.Enabled"),
                     configuration.getInt("DeploymentTasks.MaxProcesses", 8),
-                    taskConfigs, message -> logger.info("[Automation] " + message));
+                    taskConfigs, phpEnv, message -> logger.info("[Automation] " + message));
             return true;
         } catch (Exception ex) {
             logger.severe("Automation startup failed; PHP will not launch without sandbox policy: " + ex.getMessage());
