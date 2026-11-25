@@ -32,13 +32,19 @@ jobs:
             src/test/java/me/jumpwatch/webserver/automation/TaskEngineSmokeTest.java \
             src/test/java/me/jumpwatch/webserver/automation/LandlockSandboxSmokeTest.java \
             src/test/java/me/jumpwatch/webserver/automation/LandlockHelperInstallerSmokeTest.java \
-            src/test/java/me/jumpwatch/webserver/automation/SandboxFilesystemProfileSmokeTest.java
+            src/test/java/me/jumpwatch/webserver/automation/SandboxFilesystemProfileSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/PhpEnvironmentSmokeTest.java \
+            src/test/java/me/jumpwatch/webserver/automation/TaskScheduleSmokeTest.java
       - name: Test bundled helper auto-install and executable permissions
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.LandlockHelperInstallerSmokeTest
       - name: Test Landlock fallback policy
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.LandlockSandboxSmokeTest
       - name: Verify Java Landlock profiles isolate Minecraft files
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.SandboxFilesystemProfileSmokeTest
+      - name: Test PHP environment bridge and secret-safe pool config
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.PhpEnvironmentSmokeTest
+      - name: Test cron syntax and recurring PHP supervisor jobs
+        run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.TaskScheduleSmokeTest
       - name: Run process supervisor smoke test
         run: java -cp target/classes:target/automation-smoke me.jumpwatch.webserver.automation.ProcessSupervisorSmokeTest
       - name: Run deployment task persistence smoke test
